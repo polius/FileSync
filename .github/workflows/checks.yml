@@ -1,0 +1,31 @@
+name: checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # Builds the multi-stage image. This is the highest-value gate: it exercises the
+  # Dockerfile base-image bump and proves api/requirements.txt installs cleanly inside
+  # the image (the builder stage runs `pip install -r requirements.txt`).
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t filesync:ci .
+
+  # Installs the backend deps and imports the app modules, so a dependency bump that
+  # breaks an import is caught (a plain syntax check would miss runtime import errors).
+  # main.py refuses to import without SECRET_KEY, so pass a throwaway value.
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - run: pip install -r api/requirements.txt
+      - env:
+          SECRET_KEY: ci-not-a-real-secret
+        run: python -c "import api.main, api.signaling; print('import OK')"
