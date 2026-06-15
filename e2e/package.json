@@ -7,6 +7,6 @@
     "matrix": "node run.mjs"
   },
   "devDependencies": {
-    "playwright": "^1.49.0"
+    "playwright": "^1.61.0"
   }
 }
