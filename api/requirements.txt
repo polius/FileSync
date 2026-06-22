@@ -1,2 +1,2 @@
-fastapi[standard]>=0.137.2,<1.0
+fastapi[standard]>=0.138.0,<1.0
 PyJWT>=2.13.0,<3.0
