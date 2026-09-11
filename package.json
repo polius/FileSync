@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "node --test \"tests/js/*.test.mjs\""
   },
   "devDependencies": {
     "eslint": "^9.39.1",

@@ -32,7 +32,7 @@ jobs:
         run: python -c "import api.main, api.signaling; print('import OK')"
       - run: python -m pytest tests -q
 
-  # Static analysis for both sides of the app.
+  # Static analysis for both sides of the app, plus the JS unit tests (node:test).
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -48,6 +48,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
+      - run: npm test
 
   # End-to-end smoke: real Chromium pair exchanging a 100 MB file through the actual
   # container (nginx + FastAPI signaling), verified by SHA-256. Uses the same compose

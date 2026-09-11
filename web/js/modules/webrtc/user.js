@@ -1281,12 +1281,22 @@ export class User {
 
   // Inbound webrtc-file-cancel: the sender could not start the transfer we asked for
   // (e.g. their connection attempt to our per-file peer failed). Tear down the
-  // waiting row so it doesn't sit on the loading spinner forever.
+  // waiting row so it doesn't sit on the loading spinner forever. Either I am the
+  // requester (tear down my row) or I'm the host and need to forward it — a non-host
+  // sender always routes this through the host's room connection (see
+  // _notifyRequesterCancel / _onFileQueued for the same pattern).
   _onFileCancel(data) {
-    if (!data || !_isValidId(data.file_id)) return;
-    const file = this._files[data.file_id];
-    if (!file || !file.in_progress) return;
-    file._terminateReceive(file._conn, 'sender-cancel', 'The sender stopped the transfer.');
+    if (!data || !_isValidId(data.file_id) || !_isValidId(data.requester_id)) return;
+    if (data.requester_id == this._peer.id) {
+      const file = this._files[data.file_id];
+      if (!file || !file.in_progress) return;
+      file._terminateReceive(file._conn, 'sender-cancel', 'The sender stopped the transfer.');
+      return;
+    }
+    if (this._isHost) {
+      const target = this._remotePeers[data.requester_id];
+      if (target && target.conn) target.conn.send({ 'webrtc-file-cancel': data });
+    }
   }
 
   _onFileRemove(data) {
