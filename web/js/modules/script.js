@@ -363,7 +363,7 @@ function maybeShowInsecureContextWarning() {
   banner.innerHTML = `
     <strong>Heads-up:</strong> FileSync is running over plain HTTP, so large transfers may fail.
     For files over 500&nbsp;MB, please deploy FileSync with HTTPS — see the
-    <a href="https://github.com/polius/filesync#option-2-https-production-with-custom-domain" target="_blank" rel="noopener" style="color:inherit; text-decoration:underline;">HTTPS setup guide</a>.
+    <a href="https://github.com/polius/filesync#option-b--https-public-domain-recommended" target="_blank" rel="noopener" style="color:inherit; text-decoration:underline;">HTTPS setup guide</a>.
     <span id="insecure-context-banner-close" style="margin-left:10px; cursor:pointer; font-weight:bold;">×</span>
   `;
   Object.assign(banner.style, {
@@ -376,7 +376,13 @@ function maybeShowInsecureContextWarning() {
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
   });
   document.body.appendChild(banner);
-  document.getElementById('insecure-context-banner-close').onclick = () => banner.remove();
+  // The banner is position:fixed, so push the page content down to leave a gap
+  // between the banner and the UI instead of covering it.
+  document.body.style.paddingTop = `${banner.offsetHeight}px`;
+  document.getElementById('insecure-context-banner-close').onclick = () => {
+    banner.remove();
+    document.body.style.paddingTop = '';
+  };
 }
 
 // On document loaded, execute onLoad() method.
