@@ -6,7 +6,7 @@ import base64
 import uuid
 import jwt
 from datetime import datetime, timedelta, timezone
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.signaling import router as signaling_router
@@ -50,9 +50,26 @@ async def health_check():
 async def uuid_check():
     return {"uuid": str(uuid.uuid4())}
 
+# /credentials issues TURN relay credentials to anyone who can reach the API, since this
+# app has no login/session system. Rate-limit per source IP so an unauthenticated attacker
+# can't mint unlimited credentials to abuse the TURN server as an open relay.
+_CREDENTIALS_RATE_LIMIT = 10       # max requests per window per IP
+_CREDENTIALS_RATE_WINDOW = 60      # seconds
+_credentials_requests: dict[str, list[float]] = {}
+
 # Add credentials route
 @app.get("/credentials")
-async def credentials():
+async def credentials(request: Request):
+    # Enforce per-IP rate limit before issuing new credentials.
+    client_ip = request.client.host if request.client else "unknown"
+    now = time.monotonic()
+    window_start = now - _CREDENTIALS_RATE_WINDOW
+    recent = [t for t in _credentials_requests.get(client_ip, []) if t >= window_start]
+    if len(recent) >= _CREDENTIALS_RATE_LIMIT:
+        raise HTTPException(status_code=429, detail="Too many requests.")
+    recent.append(now)
+    _credentials_requests[client_ip] = recent
+
     # Define TTL (5 minutes)
     ttl = 300
 
