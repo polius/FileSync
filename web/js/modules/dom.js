@@ -83,8 +83,36 @@ export const dom = {
 
 // Display a confirmation dialog when the user attempts to refresh or navigate away from the page.
 window.addEventListener("beforeunload", (event) => {
+  // Safari (and older Chrome) only show the prompt when returnValue is set.
   event.preventDefault();
+  event.returnValue = '';
 });
+
+// Toast notification
+let _toastTimeout = null;
+export function showToast(message, type = 'success') {
+  const toast = document.getElementById('notification-toast')
+  const toastValue = document.getElementById('notification-toast-value')
+  const iconSuccess = document.getElementById('notification-toast-icon-success')
+  const iconWarning = document.getElementById('notification-toast-icon-warning')
+  if (!toast || !toastValue) return
+  toastValue.textContent = message
+  // Toggle icon based on type
+  if (iconSuccess && iconWarning) {
+    iconSuccess.style.display = type === 'warning' ? 'none' : 'inline'
+    iconWarning.style.display = type === 'warning' ? 'inline' : 'none'
+  }
+  // Clear any existing timeout
+  if (_toastTimeout) clearTimeout(_toastTimeout)
+  // Show
+  toast.style.opacity = '1'
+  toast.style.transform = 'translateX(-50%) translateY(0)'
+  // Auto-hide after 2s
+  _toastTimeout = setTimeout(() => {
+    toast.style.opacity = '0'
+    toast.style.transform = 'translateX(-50%) translateY(-100px)'
+  }, 2000)
+}
 
 // Focus the password input after the fade animation
 dom.password_modal.addEventListener('shown.bs.modal', () => {

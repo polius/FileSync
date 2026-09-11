@@ -1,3 +1,5 @@
 yourdomain.com {
+	header Strict-Transport-Security "max-age=31536000; include-subdomains"
+
 	reverse_proxy filesync:80
 }

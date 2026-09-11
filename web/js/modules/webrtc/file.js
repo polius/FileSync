@@ -1,8 +1,6 @@
-import { dom } from '../dom.js';
 import { turn } from './turn.js';
 import { applyIceMode } from './mode.js';
 import { Peer } from './peer.js';
-import { openSink, sinkState } from '../sink.js';
 
 const CHUNK_SIZE = 16 * 1024;          // 16 KiB — under SCTP message-size limits on every browser.
 const HIGH_WATER = 1 << 20;            // 1 MiB — pause reads when DataChannel buffer is this full.
@@ -32,7 +30,9 @@ export class File {
   _owner_name;
 
   // Send
-  _remotePeers = {};
+  // Keyed by wire-supplied peer ids (the signaling charset allows '__proto__') —
+  // null-prototype keeps a crafted id from resolving to Object.prototype members.
+  _remotePeers = Object.create(null);
 
   // Receive
   _peer;
@@ -201,6 +201,7 @@ export class File {
     const dc = conn.dataChannel;
     if (!dc) {
       console.error('No raw RTCDataChannel exposed for this connection.');
+      this._cancelReceiver(conn, 'no-data-channel');
       return;
     }
     dc.bufferedAmountLowThreshold = LOW_WATER;
@@ -208,16 +209,13 @@ export class File {
     // Init interval to check connection status
     this._remotePeers[data.peer_id].interval = setInterval(() => this._isAlive(conn.peer), 500)
 
-    // Send header
+    // Send header (size only — the receiver already holds name/mime from the
+    // file-add metadata, and the size is cross-checked against it on arrival).
     try {
-      dc.send(JSON.stringify({
-        type: 'header',
-        name: this._name,
-        size: this._size,
-        mime: this._content && this._content.type ? this._content.type : 'application/octet-stream',
-      }));
+      dc.send(JSON.stringify({ type: 'header', size: this._size }));
     } catch (err) {
       console.error('Failed to send transfer header:', err);
+      this._cancelReceiver(conn, 'header-failed');
       return;
     }
 
@@ -226,7 +224,10 @@ export class File {
     let offset = 0;
     while (offset < this._size) {
       // Aborted by either side, file removed, or peer disconnected
-      if (this._aborted) return;
+      if (this._aborted) {
+        this._cancelReceiver(conn, 'aborted');
+        return;
+      }
       if (!(data.peer_id in this._remotePeers)) return;
       if (this._remotePeers[data.peer_id].aborted) return;
       if (dc.readyState !== 'open') return;
@@ -237,6 +238,7 @@ export class File {
         buf = await this._content.slice(offset, end).arrayBuffer();
       } catch (err) {
         console.error('Failed to read file slice:', err);
+        this._cancelReceiver(conn, 'read-failed');
         return;
       }
 
@@ -245,6 +247,7 @@ export class File {
         dc.send(buf);
       } catch (err) {
         console.error('DataChannel send failed:', err);
+        this._cancelReceiver(conn, 'send-failed');
         return;
       }
       offset = end;
@@ -255,6 +258,16 @@ export class File {
       await this._awaitDrain(dc);
       dc.send(JSON.stringify({ type: 'end' }));
     } catch {}
+  }
+
+  // Sender side: tell the receiver a transfer died abnormally (read error, send
+  // error, header failure, owner removed the file) and close the channel. Without
+  // this the receiver would sit in in_progress forever — its close handler only
+  // fires when a close actually propagates. Best-effort: the receiver also recovers
+  // on its own if the channel dies first.
+  _cancelReceiver(conn, reason) {
+    try { conn.dataChannel.send(JSON.stringify({ type: 'cancel', reason })) } catch {}
+    try { conn.close() } catch {}
   }
 
   // Wait for the dataChannel to drain below the high-water mark. Resolves on
@@ -365,6 +378,7 @@ export class File {
         // Receiver-side handlers (sender -> receiver):
         case 'header':    return this._onHeader(conn, msg);
         case 'end':       return this._onEnd(conn);
+        case 'cancel':    return this._onSenderCancel(conn);
       }
       return;
     }
@@ -381,6 +395,15 @@ export class File {
   async _onHeader(conn, header) {
     if (this._aborted) {
       this._terminateReceive(conn, 'aborted');
+      return;
+    }
+
+    // The sender must agree with the size we learned from the file-add metadata.
+    // A mismatch means a corrupted or malicious sender — refuse to stream into the
+    // sink rather than finalizing something unrecognizable.
+    if (!header || typeof header.size !== 'number' || header.size !== this._size) {
+      console.error('Transfer header size does not match the announced file.');
+      this._terminateReceive(conn, 'size-mismatch', 'The transfer did not match the announced file.');
       return;
     }
 
@@ -402,23 +425,20 @@ export class File {
     // callers, but handle it defensively rather than silently dropping bytes.
     console.error('Sink was not pre-opened before transfer header arrived.');
     this._aborted = true;
-    this._terminateReceive(conn, 'no-sink');
-    const errEl = document.getElementById(`file-${this._id}-error`);
-    if (errEl) {
-      errEl.style.display = 'block';
-      errEl.textContent = 'Could not start the download.';
-    }
-    $style(`file-${this._id}-icon-loading`, 'display', 'none');
-    $style(`file-${this._id}-download`, 'display', 'block');
-    $style(`file-${this._id}-abort`, 'display', 'none');
+    this._terminateReceive(conn, 'no-sink', 'Could not start the download.');
   }
 
   // Single cleanup point for the receiver side of a transfer. Idempotent — safe to call
-  // from any abort/error path. Closes the connection, destroys the per-file Peer so its
-  // signaling-server socket isn't left dangling, and clears in-progress state.
-  _terminateReceive(conn, reason) {
-    try { conn.dataChannel.send(JSON.stringify({ type: 'abort', reason })); } catch {}
-    try { conn.close(); } catch {}
+  // from any abort/error path. Closes the connection (if one was established), destroys
+  // the per-file Peer so its signaling-server socket isn't left dangling, and clears
+  // in-progress state. When `message` is given, the row is switched to its failed state
+  // with that text — callers that render their own message (manual abort, file removed)
+  // omit it.
+  _terminateReceive(conn, reason, message = null) {
+    if (conn) {
+      try { conn.dataChannel.send(JSON.stringify({ type: 'abort', reason })); } catch {}
+      try { conn.close(); } catch {}
+    }
     if (this._sink) {
       // Queue the abort behind any in-flight writes: FileSystemWritableFileStream
       // holds a lock while a write is pending, so an immediate abort() would reject
@@ -437,6 +457,16 @@ export class File {
     try { if (this._peer) this._peer.destroy(); } catch {}
     this._conn = null;
     this._in_progress = false;
+    if (message) {
+      $set(`file-${this._id}-progress`, 'textContent', '');
+      $style(`file-${this._id}-icon-loading`, 'display', 'none');
+      $style(`file-${this._id}-icon-success`, 'display', 'none');
+      $style(`file-${this._id}-icon-failed`, 'display', 'block');
+      $style(`file-${this._id}-abort`, 'display', 'none');
+      $style(`file-${this._id}-download`, 'display', 'block');
+      $style(`file-${this._id}-error`, 'display', 'block');
+      $set(`file-${this._id}-error`, 'textContent', message);
+    }
   }
 
   async _onChunk(conn, buf) {
@@ -481,7 +511,24 @@ export class File {
     }
   }
 
+  // Receiver side: the sender told us the transfer died on its end (read error, send
+  // error, file removed, ...). Tear down immediately instead of waiting for a close
+  // that may never propagate.
+  _onSenderCancel(conn) {
+    if (this._conn !== conn) return;
+    this._aborted = true;
+    this._terminateReceive(conn, 'sender-cancel', 'The sender stopped the transfer.');
+  }
+
   async _onEnd(conn) {
+    // Never finalize a file whose byte count disagrees with what was announced —
+    // that would mark a corrupt/truncated transfer as a success.
+    if (this._transferred !== this._size) {
+      console.error(`Incomplete transfer: ${this._transferred}/${this._size} bytes received.`);
+      this._terminateReceive(conn, 'incomplete', 'The transfer was incomplete.');
+      return;
+    }
+
     if (this._zip) {
       if (this._zipController) {
         try { this._zipController.close(); } catch {}
@@ -546,20 +593,13 @@ export class File {
     // abort the sink so we don't leave a half-written file, and destroy the per-file
     // Peer so its signaling socket isn't left dangling.
     if (this._transferred < this._size && this._in_progress) {
-      this._terminateReceive(conn, 'connection-closed');
-    } else if (this._in_progress && this._sink && this._transferred >= this._size) {
+      this._terminateReceive(conn, 'connection-closed', 'The connection was lost.');
+    } else if (this._in_progress && (this._sink || this._zip) && this._transferred >= this._size) {
       // Every byte arrived but the channel closed before the explicit 'end' frame
       // (e.g. the sender's tab closed right after the last chunk). Finalize as a
       // success instead of stranding the data in an unclosed sink and leaving the
       // row stuck in_progress.
       this._onEnd(conn);
-    } else if (this._zip && this._zipController) {
-      // Connection closed cleanly but in zip mode the controller is still pending —
-      // happens if the sender closed without sending an explicit 'end'. Treat as abort.
-      try { this._zipController.error(new Error('connection-closed')); } catch {}
-      this._zipController = null;
-      try { if (this._peer) this._peer.destroy(); } catch {}
-      this._in_progress = false;
     }
   }
 
@@ -573,6 +613,7 @@ export class File {
 
   async _getUUID() {
     const response = await fetch(`/api/uuid`);
+    if (!response.ok) throw new Error(`uuid endpoint failed: HTTP ${response.status}`);
     const data = await response.json();
     return data['uuid'];
   }

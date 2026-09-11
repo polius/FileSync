@@ -49,9 +49,8 @@ class Turn {
     // Parse the response as JSON
     const data = await response.json();
 
-    // Get JWT from cookie
     const token = data.token
-    if (!token) throw new Error("Token cookie not found");
+    if (!token) throw new Error("No token in credential response");
 
     // Decode JWT to get username and credential
     const payload = this._decodeJwt(token);
@@ -63,9 +62,12 @@ class Turn {
   };
 
   _decodeJwt(token) {
-    const payload = token.split(".")[1];
-    const json = atob(payload);
-    return JSON.parse(json);
+    // JWTs are base64url-encoded (with padding stripped); normalize for atob().
+    const parts = (token || '').split('.');
+    if (parts.length < 2) throw new Error('Malformed JWT.');
+    let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4 !== 0) b64 += '=';
+    return JSON.parse(atob(b64));
   }
 }
 

@@ -27,11 +27,11 @@ function readOverride() {
     const fromQuery = params.get('sink');
     if (fromQuery && SINK_MODES.includes(fromQuery)) {
       mode = fromQuery;
-      if (mode === 'auto') window.localStorage.removeItem('filesync.sink');
-      else window.localStorage.setItem('filesync.sink', mode);
+      if (mode === 'auto') window.sessionStorage.removeItem('filesync.sink');
+      else window.sessionStorage.setItem('filesync.sink', mode);
     }
     if (!mode) {
-      const stored = window.localStorage.getItem('filesync.sink');
+      const stored = window.sessionStorage.getItem('filesync.sink');
       if (stored && SINK_MODES.includes(stored) && stored !== 'auto') mode = stored;
     }
   } catch {}
@@ -343,7 +343,7 @@ export function installSinkBadge() {
 }
 
 function resetSink() {
-  try { window.localStorage.removeItem('filesync.sink'); } catch {}
+  try { window.sessionStorage.removeItem('filesync.sink'); } catch {}
   const url = new URL(window.location.href);
   url.searchParams.delete('sink');
   window.location.replace(url.toString());

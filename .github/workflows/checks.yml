@@ -15,9 +15,10 @@ jobs:
       - uses: actions/checkout@v7
       - run: docker build -t filesync:ci .
 
-  # Installs the backend deps and imports the app modules, so a dependency bump that
-  # breaks an import is caught (a plain syntax check would miss runtime import errors).
-  # main.py refuses to import without SECRET_KEY, so pass a throwaway value.
+  # Installs the backend deps, imports the app modules, and runs the backend unit
+  # tests. The import check catches dependency bumps that break imports (a plain
+  # syntax check would miss runtime import errors); main.py refuses to import without
+  # SECRET_KEY, so pass a throwaway value.
   python:
     runs-on: ubuntu-latest
     steps:
@@ -25,7 +26,52 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
-      - run: pip install -r api/requirements.txt
+      - run: pip install -r api/requirements.txt pytest
       - env:
           SECRET_KEY: ci-not-a-real-secret
         run: python -c "import api.main, api.signaling; print('import OK')"
+      - run: python -m pytest tests -q
+
+  # Static analysis for both sides of the app.
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - run: pip install ruff
+      - run: ruff check api tests
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
+  # End-to-end smoke: real Chromium pair exchanging a 100 MB file through the actual
+  # container (nginx + FastAPI signaling), verified by SHA-256. Uses the same compose
+  # topology users deploy with, only swapping in a CI secret and a locally built image.
+  e2e-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build image and start stack
+        run: |
+          # Tag :latest so `docker compose up` below uses this build instead of
+          # pulling the released image from Docker Hub. Never pushed.
+          docker build -t poliuscorp/filesync:latest .
+          sed "s/<SECRET_KEY>/ci-e2e-not-a-real-secret/g" deploy/docker-compose.yml > docker-compose.ci.yml
+          docker compose -f docker-compose.ci.yml up -d --wait
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run smoke cell (chromium / sw sink / auto ICE)
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          node run.mjs --smoke --base-url=http://localhost --size=20M
+      - name: Teardown
+        if: always()
+        run: docker compose -f docker-compose.ci.yml down -v

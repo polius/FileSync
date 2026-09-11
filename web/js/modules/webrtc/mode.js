@@ -31,11 +31,11 @@ function readOverride() {
     const fromQuery = params.get(QUERY_KEY);
     if (fromQuery && ICE_MODES.includes(fromQuery)) {
       mode = fromQuery;
-      if (mode === 'auto') window.localStorage.removeItem(STORAGE_KEY);
-      else window.localStorage.setItem(STORAGE_KEY, mode);
+      if (mode === 'auto') window.sessionStorage.removeItem(STORAGE_KEY);
+      else window.sessionStorage.setItem(STORAGE_KEY, mode);
     }
     if (!mode) {
-      const stored = window.localStorage.getItem(STORAGE_KEY);
+      const stored = window.sessionStorage.getItem(STORAGE_KEY);
       if (stored && ICE_MODES.includes(stored) && stored !== 'auto') mode = stored;
     }
   } catch {}
@@ -79,7 +79,7 @@ export function installIceModeBadge() {
 }
 
 function resetIce() {
-  try { window.localStorage.removeItem(STORAGE_KEY); } catch {}
+  try { window.sessionStorage.removeItem(STORAGE_KEY); } catch {}
   const url = new URL(window.location.href);
   url.searchParams.delete(QUERY_KEY);
   window.location.replace(url.toString());

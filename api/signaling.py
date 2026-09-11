@@ -178,7 +178,12 @@ def _client_host_hint(ws: WebSocket) -> Optional[str]:
         end = host.find(']')
         if end < 0:
             return None
-        return host[1:end]
+        inner = host[1:end]
+        try:
+            ipaddress.ip_address(inner)  # must be a bare IPv6 literal, reject '[:]' etc.
+        except ValueError:
+            return None
+        return inner
     if ':' in host:
         host = host.split(':', 1)[0]
     return host or None

@@ -9,30 +9,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <link href="css/style.css" rel="stylesheet">
-    <script>
-      if (window.localStorage.getItem('mode') == 'light') {
-        document.documentElement.classList.remove("dark")
-        document.documentElement.classList.add("light")
-        document.documentElement.setAttribute('data-bs-theme', 'light')
-      }
-      else {
-        document.documentElement.classList.remove("light")
-        document.documentElement.classList.add("dark")
-        document.documentElement.setAttribute('data-bs-theme', 'dark')
-      }
-    </script>
+    <script src="js/theme.js"></script>
   </head>
   <body>
     <div class="header">
-      <span id="theme-text" rel="preload" onclick="themeClick()" style="cursor:pointer">Dark</span>
+      <span id="theme-text" style="cursor:pointer">Dark</span>
       <span style="padding-left: 5px; padding-right: 5px;">|</span>
-      <span id="about-text" rel="preload" onclick="aboutClick()" style="cursor:pointer">About</span>
+      <span id="about-text" style="cursor:pointer">About</span>
     </div>
     <div class="master-div" style="padding-top:3vh">
       <div class="col-lg-7 mx-auto p-4" style="width:100%">
 
         <!-- HEADER-->
-        <div onclick="window.location.href = '/'" class="row align-items-center head mb-4" style="cursor: pointer">
+        <div id="header-logo" class="row align-items-center head mb-4" style="cursor: pointer">
           <div class="col col-auto">
             <div class="icon d-inline-block">
               <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="currentColor" class="bi bi-wifi" viewBox="0 0 16 16">
@@ -94,8 +83,8 @@
           </div>
           <p>This room is protected with password.</p>
           <div class="input-group mb-1">
-            <input id="password-input" class="form-control" type="password" placeholder="Enter a password" autocomplete="off" onkeypress="if (event.key === 'Enter' || event.key === 'NumpadEnter') { connectWithPassword() }" style="border-top-right-radius:0!important; border-bottom-right-radius:0!important">
-            <button onclick="togglePasswordVisibility('password-input','password-show','password-hide')" class="btn" type="button" style="background-color: #212529; color:#fff; border-color: rgb(86, 92, 110); margin-left:-1px; border-top-left-radius: 0; border-bottom-left-radius: 0">
+            <input id="password-input" class="form-control" type="password" placeholder="Enter a password" autocomplete="off" style="border-top-right-radius:0!important; border-bottom-right-radius:0!important">
+            <button id="password-input-toggle" class="btn" type="button" style="background-color: #212529; color:#fff; border-color: rgb(86, 92, 110); margin-left:-1px; border-top-left-radius: 0; border-bottom-left-radius: 0">
               <svg id="password-hide" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-eye-slash-fill" viewBox="0 0 16 16" style="margin-bottom:0px!important; display:block;">
                 <path d="m10.79 12.912-1.614-1.615a3.5 3.5 0 0 1-4.474-4.474l-2.06-2.06C.938 6.278 0 8 0 8s3 5.5 8 5.5a7.029 7.029 0 0 0 2.79-.588zM5.21 3.088A7.028 7.028 0 0 1 8 2.5c5 0 8 5.5 8 5.5s-.939 1.721-2.641 3.238l-2.062-2.062a3.5 3.5 0 0 0-4.474-4.474L5.21 3.089z"/>
                 <path d="M5.525 7.646a2.5 2.5 0 0 0 2.829 2.829l-2.83-2.829zm4.95.708-2.829-2.83a2.5 2.5 0 0 1 2.829 2.829zm3.171 6-12-12 .708-.708 12 12-.708.708z"/>
@@ -112,7 +101,7 @@
             </svg>
             This password is not valid.
           </div>
-          <button id="password-submit" onclick="connectWithPassword()" class="btn btn-primary" type="button" style="height:40px; width:100%; font-size: 1rem; border-radius: 5px; margin-top:15px">
+          <button id="password-submit" class="btn btn-primary" type="button" style="height:40px; width:100%; font-size: 1rem; border-radius: 5px; margin-top:15px">
             <div id="password-loading" class="spinner-border" style="color: white; width: 0.9rem; height: 0.9rem; --bs-spinner-border-width: 0.1em; margin-bottom:1px; margin-right:5px; display: none;"></div>
             Submit
           </button>
@@ -146,7 +135,7 @@
 
               <p style="font-size:17px; margin-top:15px; margin-bottom:15px; font-weight:500">Share room link to devices you want to share files with.</p>
 
-              <div onclick="copyURL()" class="input-group flex-nowrap" style="margin-bottom: 5px; cursor: pointer;">
+              <div id="transfer-url-row" class="input-group flex-nowrap" style="margin-bottom: 5px; cursor: pointer;">
                 <span id="transfer-url-value" class="form-control" style="font-family: Consolas,monaco,monospace; font-size: 15px; padding-top:12px; padding-bottom:12px; text-decoration: none; word-wrap: break-word; color: var(--color-url)"></span>
                 <span id="transfer-url-copy" class="input-group-text" style="width: 48px; border-top-right-radius: 5px; border-bottom-right-radius: 5px;" title="Copy URL">
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-copy" viewBox="0 0 16 16" style="margin-left:3px">
@@ -162,16 +151,16 @@
 
               <div class="row">
                 <div class="col-auto" style="padding-right:0; padding-top:15px">
-                  <button id="transfer-select-file" class="btn btn-primary" type="button" onclick="document.getElementById('transfer-select-file-input').click()" style="height:50px; font-size: 1.05rem; border-radius: 100px;">
+                  <button id="transfer-select-file" class="btn btn-primary" type="button" style="height:50px; font-size: 1.05rem; border-radius: 100px;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="white" class="bi bi-plus" viewBox="0 0 16 16" style="margin-left:3px; margin-bottom: 2px">
                       <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
                     </svg>
                     <span style="margin-right: 10px;">Send Files</span>
                   </button>
-                  <input id="transfer-select-file-input" type="file" multiple onchange="sendFiles(this)" style="display: none"/>
+                  <input id="transfer-select-file-input" type="file" multiple style="display: none"/>
                 </div>
                 <div id="transfer-add-password" class="col col-auto" style="padding-top:15px; display: none;">
-                  <button class="btn btn-success" type="button" onclick="addPassword()" style="height:50px; font-size: 1.05rem; border-radius: 100px">
+                  <button id="transfer-add-password-btn" class="btn btn-success" type="button" style="height:50px; font-size: 1.05rem; border-radius: 100px">
                     <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" class="bi bi-shield-shaded" viewBox="0 0 16 16" style="margin-left:10px; margin-right:5px; margin-bottom:3px">
                       <path fill-rule="evenodd" d="M8 14.933a1 1 0 0 0 .1-.025q.114-.034.294-.118c.24-.113.547-.29.893-.533a10.7 10.7 0 0 0 2.287-2.233c1.527-1.997 2.807-5.031 2.253-9.188a.48.48 0 0 0-.328-.39c-.651-.213-1.75-.56-2.837-.855C9.552 1.29 8.531 1.067 8 1.067zM5.072.56C6.157.265 7.31 0 8 0s1.843.265 2.928.56c1.11.3 2.229.655 2.887.87a1.54 1.54 0 0 1 1.044 1.262c.596 4.477-.787 7.795-2.465 9.99a11.8 11.8 0 0 1-2.517 2.453 7 7 0 0 1-1.048.625c-.28.132-.581.24-.829.24s-.548-.108-.829-.24a7 7 0 0 1-1.048-.625 11.8 11.8 0 0 1-2.517-2.453C1.928 10.487.545 7.169 1.141 2.692A1.54 1.54 0 0 1 2.185 1.43 63 63 0 0 1 5.072.56"/>
                     </svg>
@@ -191,7 +180,7 @@
                   <span id="transfer-users-count"> (0)</span>
                 </div>
                 <div class="col col-3-3" style="text-align: right">
-                  <span onclick="changeName()" title="Change your name" class="card-header-action">
+                  <span id="transfer-users-change-name" title="Change your name" class="card-header-action">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-person-circle" viewBox="0 0 16 16" style="margin-bottom: 2px; margin-right: 4px">
                       <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0"/>
                       <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8m8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1"/>
@@ -222,7 +211,7 @@
                   <span id="transfer-files-count"> (0)</span>
                 </div>
                 <div class="col col-3-3" style="text-align: right">
-                  <span onclick="downloadAll()" id="transfer-files-download" title="Download all files" class="card-header-action">
+                  <span id="transfer-files-download" title="Download all files" class="card-header-action">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cloud-arrow-down-fill" viewBox="0 0 16 16" style="margin-right:4px; margin-bottom:2px">
                       <path d="M8 2a5.53 5.53 0 0 0-3.594 1.342c-.766.66-1.321 1.52-1.464 2.383C1.266 6.095 0 7.555 0 9.318 0 11.366 1.708 13 3.781 13h8.906C14.502 13 16 11.57 16 9.773c0-1.636-1.242-2.969-2.834-3.194C12.923 3.999 10.69 2 8 2m2.354 6.854-2 2a.5.5 0 0 1-.708 0l-2-2a.5.5 0 1 1 .708-.708L7.5 9.293V5.5a.5.5 0 0 1 1 0v3.793l1.146-1.147a.5.5 0 0 1 .708.708"/>
                     </svg>
@@ -253,8 +242,8 @@
               <div class="modal-body">
                 <label class="mb-1" for="password">Password</label>
                 <div class="input-group mb-2">
-                  <input id="password-modal-value" class="form-control" type="password" placeholder="Enter a password" autocomplete="off" onkeypress="if (event.key === 'Enter' || event.key === 'NumpadEnter') { addPasswordSubmit() }" style="border-top-right-radius:0!important; border-bottom-right-radius:0!important">
-                  <button onclick="togglePasswordVisibility('password-modal-value','password-button-show','password-button-hide')" class="btn" type="button" style="background-color: #212529; color:#fff; border-color: rgb(86, 92, 110); margin-left:-1px; border-top-left-radius: 0; border-bottom-left-radius: 0">
+                  <input id="password-modal-value" class="form-control" type="password" placeholder="Enter a password" autocomplete="off" style="border-top-right-radius:0!important; border-bottom-right-radius:0!important">
+                  <button id="password-modal-toggle" class="btn" type="button" style="background-color: #212529; color:#fff; border-color: rgb(86, 92, 110); margin-left:-1px; border-top-left-radius: 0; border-bottom-left-radius: 0">
                     <svg id="password-button-hide" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-eye-slash-fill" viewBox="0 0 16 16" style="margin-bottom:0px!important; display:block;">
                       <path d="m10.79 12.912-1.614-1.615a3.5 3.5 0 0 1-4.474-4.474l-2.06-2.06C.938 6.278 0 8 0 8s3 5.5 8 5.5a7.029 7.029 0 0 0 2.79-.588zM5.21 3.088A7.028 7.028 0 0 1 8 2.5c5 0 8 5.5 8 5.5s-.939 1.721-2.641 3.238l-2.062-2.062a3.5 3.5 0 0 0-4.474-4.474L5.21 3.089z"/>
                       <path d="M5.525 7.646a2.5 2.5 0 0 0 2.829 2.829l-2.83-2.829zm4.95.708-2.829-2.83a2.5 2.5 0 0 1 2.829 2.829zm3.171 6-12-12 .708-.708 12 12-.708.708z"/>
@@ -268,7 +257,7 @@
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button onclick="addPasswordSubmit()" type="button" class="btn btn-primary">
+                <button id="password-modal-confirm" type="button" class="btn btn-primary">
                   <span id="modalLoading" class="spinner-border spinner-border-sm" style="display:none; width:15px; height:15px; border-width:2px; margin-right:5px" aria-hidden="true"></span>
                   Confirm
                 </button>
@@ -293,11 +282,11 @@
               </div>
               <div class="modal-body">
                 <label class="mb-1" for="name">New name</label>
-                <input id="name-modal-value" class="form-control" placeholder="Enter your new name" autocomplete="off" onkeypress="if (event.key === 'Enter' || event.key === 'NumpadEnter') { changeNameSubmit() }" style="border-top-right-radius:0!important; border-bottom-right-radius:0!important">
+                <input id="name-modal-value" class="form-control" placeholder="Enter your new name" autocomplete="off" style="border-top-right-radius:0!important; border-bottom-right-radius:0!important">
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button onclick="changeNameSubmit()" type="button" class="btn btn-primary">Confirm</button>
+                <button id="name-modal-confirm" type="button" class="btn btn-primary">Confirm</button>
               </div>
             </div>
           </div>
@@ -387,7 +376,7 @@
                 </div>
               </div>
               <div class="modal-footer">
-                <button id="download-modal-cancel" onclick="cancelDownloadAll()" type="button" class="btn btn-danger">
+                <button id="download-modal-cancel" type="button" class="btn btn-danger">
                   <div id="download-modal-cancel-spinner" class="spinner-border" style="color: var(--color-h1); width: 1.1rem; height: 1.1rem; --bs-spinner-border-width: 0.1em; margin-bottom:-1px; margin-right:6px; display: none;"></div>
                   Cancel
                 </button>

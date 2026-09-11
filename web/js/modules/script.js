@@ -1,4 +1,4 @@
-import { dom } from './dom.js';
+import { dom, showToast } from './dom.js';
 import { User } from './webrtc/user.js';
 import { registerServiceWorker, installSinkBadge, sinkState, activeMode } from './sink.js';
 import { installIceModeBadge } from './webrtc/mode.js';
@@ -25,11 +25,16 @@ if (window.localStorage.getItem('mode') == 'light') {
   qr.set({foreground: '#212529'});
 }
 
-// Load app version from API
+// Load app version from API. Cosmetic — never let it block or break app boot.
 async function loadVersion() {
-  const res = await fetch('/api/');
-  const data = await res.json();
-  document.getElementById('appVersion').textContent = `v${data.version}`;
+  try {
+    const res = await fetch('/api/');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.version) {
+      document.getElementById('appVersion').textContent = `v${data.version}`;
+    }
+  } catch {}
 }
 
 // On Load
@@ -68,11 +73,11 @@ async function onLoad() {
 
     // Init UI Components
     dom.transfer_div.style.display = 'block'
-    dom.transfer_url_value.innerHTML = `${window.location.origin}/${new_room_id}`
+    dom.transfer_url_value.textContent = `${window.location.origin}/${new_room_id}`
     dom.transfer_users_list_host_name.innerHTML = user.name + ' (You)'
     dom.transfer_users_count.innerHTML = ' (1)'
     dom.transfer_add_password.style.display = 'block';
-    qr.set({value: dom.transfer_url_value.innerHTML});
+    qr.set({value: dom.transfer_url_value.textContent});
 
     // Init peer connection. user.init throws on ICE-credential failure or any pre-
     // 'open' Peer error — surface that here so the host UI doesn't sit silently on
@@ -92,8 +97,8 @@ async function onLoad() {
   else {
     // Init UI Componente
     dom.connect_div.style.display = 'block'
-    dom.transfer_url_value.innerHTML = `${window.location.origin}/${room_id}`
-    qr.set({value: dom.transfer_url_value.innerHTML});
+    dom.transfer_url_value.textContent = `${window.location.origin}/${room_id}`
+    qr.set({value: dom.transfer_url_value.textContent});
 
     // Init peer connection. See host-path comment above — same contract.
     try {
@@ -141,7 +146,6 @@ function themeClick() {
     qr.set({foreground: '#adb5db'});
   }
 }
-window.themeClick = themeClick;
 
 // About
 function aboutClick() {
@@ -156,13 +160,11 @@ function aboutClick() {
     dom.transfer_div.style.display = 'block'
   }
 }
-window.aboutClick = aboutClick;
 
 function addPassword() {
   const modal = new bootstrap.Modal(dom.password_modal)
   modal.show()
 }
-window.addPassword = addPassword;
 
 // Show / Hide password
 function togglePasswordVisibility(input_name, button_show_name, button_hide_name) {
@@ -180,7 +182,6 @@ function togglePasswordVisibility(input_name, button_show_name, button_hide_name
   }
   password_input.focus()
 }
-window.togglePasswordVisibility = togglePasswordVisibility;
 
 // Confirm change password
 function addPasswordSubmit() {
@@ -190,7 +191,6 @@ function addPasswordSubmit() {
   dom.transfer_status_protected.style.display = user.password.length == 0 ? 'none' : 'inline-block'
   showToast(user.password.length == 0 ? 'Password removed.' : 'Password set.')
 }
-window.addPasswordSubmit = addPasswordSubmit;
 
 function connectWithPassword() {
   if (dom.password_input.value.trim().length == 0) {
@@ -211,7 +211,6 @@ function connectWithPassword() {
     })
   }
 }
-window.connectWithPassword = connectWithPassword;
 
 // Change name
 function changeName() {
@@ -220,17 +219,15 @@ function changeName() {
   const modal = new bootstrap.Modal(dom.name_modal)
   modal.show()
 }
-window.changeName = changeName;
 
 function changeNameSubmit() {
   // Update name
   user.changeName(dom.name_modal_value.value.trim())
 }
-window.changeNameSubmit = changeNameSubmit;
 
 // Copy Room url
 function copyURL() {
-  const url = dom.transfer_url_value.innerHTML;
+  const url = dom.transfer_url_value.textContent;
   if (navigator.clipboard && window.isSecureContext) {
     // Secure context (HTTPS)
     navigator.clipboard.writeText(url)
@@ -255,76 +252,48 @@ function copyURL() {
     dom.transfer_url_copy.style.display = 'flex'
   }, 1000)
 }
-window.copyURL = copyURL;
 
 // Send File
 function sendFiles(event) {
   user.addFiles(event.files)
 }
-window.sendFiles = sendFiles;
-
-// Remove file
-function removeFile(fileId) {
-  user.removeFile(fileId)
-}
-window.removeFile = removeFile;
-
-// Download File
-function downloadFile(id) {
-  user.downloadFile(id)
-}
-window.downloadFile = downloadFile;
-
-// Abort File (Stop file download)
-function abortFile(fileId) {
-  user.abortFile(fileId)
-}
-window.abortFile = abortFile;
-
-// See details
-function showFileDetails(fileId) {
-  user.showFileDetails(fileId)
-}
-window.showFileDetails = showFileDetails;
 
 // Download all
 function downloadAll() {
   user.downloadAll()
 }
-window.downloadAll = downloadAll;
 
 // Cancel download all
 function cancelDownloadAll() {
   user.downloadAllCancel()
 }
-window.cancelDownloadAll = cancelDownloadAll;
 
-// Toast notification
-let _toastTimeout = null;
-function showToast(message, type = 'success') {
-  const toast = document.getElementById('notification-toast')
-  const toastValue = document.getElementById('notification-toast-value')
-  const iconSuccess = document.getElementById('notification-toast-icon-success')
-  const iconWarning = document.getElementById('notification-toast-icon-warning')
-  if (!toast || !toastValue) return
-  toastValue.textContent = message
-  // Toggle icon based on type
-  if (iconSuccess && iconWarning) {
-    iconSuccess.style.display = type === 'warning' ? 'none' : 'inline'
-    iconWarning.style.display = type === 'warning' ? 'inline' : 'none'
-  }
-  // Clear any existing timeout
-  if (_toastTimeout) clearTimeout(_toastTimeout)
-  // Show
-  toast.style.opacity = '1'
-  toast.style.transform = 'translateX(-50%) translateY(0)'
-  // Auto-hide after 2s
-  _toastTimeout = setTimeout(() => {
-    toast.style.opacity = '0'
-    toast.style.transform = 'translateX(-50%) translateY(-100px)'
-  }, 2000)
+// Bind all event handlers. The CSP forbids inline handlers (script-src 'self'),
+// so every element that used onclick/onkeypress/onchange in index.html is wired
+// up here instead.
+function bindUI() {
+  const on = (id, event, fn) => document.getElementById(id)?.addEventListener(event, fn);
+  const onEnter = (id, fn) => on(id, 'keydown', (e) => { if (e.key === 'Enter') fn(); });
+
+  on('theme-text', 'click', themeClick);
+  on('about-text', 'click', aboutClick);
+  on('header-logo', 'click', () => { window.location.href = '/' });
+  onEnter('password-input', connectWithPassword);
+  on('password-input-toggle', 'click', () => togglePasswordVisibility('password-input', 'password-show', 'password-hide'));
+  on('password-submit', 'click', connectWithPassword);
+  on('transfer-url-row', 'click', copyURL);
+  on('transfer-select-file', 'click', () => dom.transfer_select_file_input.click());
+  on('transfer-select-file-input', 'change', (e) => sendFiles(e.target));
+  on('transfer-add-password-btn', 'click', addPassword);
+  on('transfer-users-change-name', 'click', changeName);
+  on('transfer-files-download', 'click', downloadAll);
+  onEnter('password-modal-value', addPasswordSubmit);
+  on('password-modal-toggle', 'click', () => togglePasswordVisibility('password-modal-value', 'password-button-show', 'password-button-hide'));
+  on('password-modal-confirm', 'click', addPasswordSubmit);
+  onEnter('name-modal-value', changeNameSubmit);
+  on('name-modal-confirm', 'click', changeNameSubmit);
+  on('download-modal-cancel', 'click', cancelDownloadAll);
 }
-window.showToast = showToast;
 
 // Drag and Drop on transfer-div
 function initDropZone() {
@@ -412,6 +381,7 @@ function maybeShowInsecureContextWarning() {
 
 // On document loaded, execute onLoad() method.
 (() => {
+  bindUI()
   onLoad()
   initDropZone()
 })();

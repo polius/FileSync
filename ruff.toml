@@ -1,0 +1,6 @@
+target-version = "py314"
+line-length = 110
+
+[lint]
+# E4/E7/E9 + F: real error classes only, no style enforcement.
+select = ["E4", "E7", "E9", "F"]

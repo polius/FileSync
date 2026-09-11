@@ -20,7 +20,7 @@ if not SECRET_KEY or SECRET_KEY == "<SECRET_KEY>":
     raise RuntimeError("SECRET_KEY environment variable is required (replace the <SECRET_KEY> placeholder with a real secret).")
 
 # Init FastAPI
-app = FastAPI(title='FileSync API', version='4.0.0', root_path="/api")
+app = FastAPI(title='FileSync API', version='4.1.0', root_path="/api")
 
 # CORS is only needed when the frontend is served from a different origin than the API
 # (i.e. local development). In production everything is same-origin behind the reverse
