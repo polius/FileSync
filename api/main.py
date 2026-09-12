@@ -51,16 +51,35 @@ async def uuid_check():
     return {"uuid": str(uuid.uuid4())}
 
 # /credentials issues TURN relay credentials to anyone who can reach the API, since this
-# app has no login/session system. Rate-limit per source IP so an unauthenticated attacker
-# can't mint unlimited credentials to abuse the TURN server as an open relay.
-_CREDENTIALS_RATE_LIMIT = 10       # max requests per window per IP
-_CREDENTIALS_RATE_WINDOW = 60      # seconds
+# app is deliberately account-less (see README: "No installs, no accounts") — there is no
+# login/session system to gate this endpoint behind, and none is needed: TURN credentials
+# are short-lived (5 min TTL below) and only useful for relaying WebRTC media, not for
+# accessing any other resource.
+#
+# Primary protection against credential-minting floods is the reverse proxy: the supplied
+# nginx.conf rate-limits `location = /api/credentials` (zone "credentials", 20r/s,
+# burst=40 nodelay) before requests reach this process at all. The limiter below is a
+# defense-in-depth backstop for deployments that bypass or don't use that config (FastAPI
+# exposed directly, or fronted by a different reverse proxy) — it is not the primary
+# control, and its numbers are intentionally generous relative to nginx's, since a
+# legitimate client only needs one request roughly every 5 minutes (it caches the
+# credential for the TTL below).
+_CREDENTIALS_RATE_LIMIT = 10          # max requests per window per IP
+_CREDENTIALS_RATE_WINDOW = 60         # seconds
 _credentials_requests: dict[str, list[float]] = {}
+
+# Cap on distinct IPs tracked at once. This map is keyed by arbitrary source IPs (unlike
+# signaling.py's pair_timestamps, naturally bounded by currently-connected peers) — without
+# a cap it could grow without bound for the life of the process. Each entry is tiny, so
+# even this cap is a trivial amount of memory; sized well above realistic concurrent
+# source-IP counts for a self-hosted instance.
+_CREDENTIALS_MAX_TRACKED_IPS = 4096
 
 # Add credentials route
 @app.get("/credentials")
 async def credentials(request: Request):
-    # Enforce per-IP rate limit before issuing new credentials.
+    # Enforce per-IP rate limit before issuing new credentials (see comment above the
+    # constants for why this exists alongside nginx's rate limiting).
     client_ip = request.client.host if request.client else "unknown"
     now = time.monotonic()
     window_start = now - _CREDENTIALS_RATE_WINDOW
@@ -69,6 +88,17 @@ async def credentials(request: Request):
         raise HTTPException(status_code=429, detail="Too many requests.")
     recent.append(now)
     _credentials_requests[client_ip] = recent
+
+    # Opportunistic cleanup (same idea as pair_timestamps in signaling.py): once the map
+    # exceeds the cap, evict IPs with no timestamps left in the current window — including
+    # IPs that made one request and never returned, not just ones still calling in.
+    if len(_credentials_requests) > _CREDENTIALS_MAX_TRACKED_IPS:
+        stale_ips = [
+            ip for ip, timestamps in _credentials_requests.items()
+            if not any(t >= window_start for t in timestamps)
+        ]
+        for ip in stale_ips:
+            del _credentials_requests[ip]
 
     # Define TTL (5 minutes)
     ttl = 300
