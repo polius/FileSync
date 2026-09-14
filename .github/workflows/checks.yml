@@ -42,7 +42,7 @@ jobs:
           python-version: "3.14"
       - run: pip install ruff
       - run: ruff check api tests
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -64,7 +64,7 @@ jobs:
           docker build -t poliuscorp/filesync:latest .
           sed "s/<SECRET_KEY>/ci-e2e-not-a-real-secret/g" deploy/docker-compose.yml > docker-compose.ci.yml
           docker compose -f docker-compose.ci.yml up -d --wait
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Run smoke cell (chromium / sw sink / auto ICE)
