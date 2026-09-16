@@ -179,6 +179,7 @@ async function openFsSink({ name, mime }) {
   return {
     mode: 'fs',
     async write(chunk) { await writable.write(chunk); },
+    async truncate0() { await writable.truncate(0); },
     async close() { await writable.close(); },
     async abort(reason) {
       try { await writable.abort(reason); } catch {}
@@ -192,86 +193,89 @@ function extensionFromName(name) {
 }
 
 // ---- SW streaming sink --------------------------------------------------------------
+//
+// Bytes are staged into an OPFS file while the transfer runs; the browser download is
+// created only at close(), streaming the staged file into the Service Worker response.
+// A failed/interrupted transfer therefore never leaves a partial download behind, and
+// the staged file doubles as the resume buffer across reconnections.
 
 async function openSwSink({ id, name, size, mime }) {
-  const reg = sinkState.serviceWorkerRegistration;
-  const sw = reg && (reg.active || reg.waiting || reg.installing);
-  if (!sw) throw new Error('Service Worker not available.');
+  if (!navigator.storage || typeof navigator.storage.getDirectory !== 'function') {
+    throw new Error('OPFS is not available in this browser.');
+  }
+  const root = await navigator.storage.getDirectory();
+  const stagingName = `filesync-part-${id}`;
+  // Leftover staging from an earlier session with this id is dead weight — drop it.
+  try { await root.removeEntry(stagingName); } catch {}
+  const handle = await root.getFileHandle(stagingName, { create: true });
+  const writable = await handle.createWritable();
 
-  const channel = new MessageChannel();
-  // Forward-reference holder so the port message handler below can route 'cancel' to
-  // THIS sink's _onCancel rather than to a global "last sink" — required to keep
-  // concurrent SW sinks (e.g. files.zip + a separate per-file download) routing their
-  // own browser-cancel events independently.
-  let sink = null;
-  const ready = new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('Service Worker did not respond.')), 5000);
-    channel.port1.onmessage = (ev) => {
-      if (ev.data?.type === 'ready') {
-        clearTimeout(timeout);
-        resolve();
-      } else if (ev.data?.type === 'cancel') {
-        // User cancelled the browser download — call this sink's onCancel hook (if any).
-        if (sink && typeof sink._onCancel === 'function') sink._onCancel();
-      }
-    };
-  });
+  const cleanupStaging = () => {
+    setTimeout(() => { root.removeEntry(stagingName).catch(() => {}); }, 30_000);
+  };
 
-  (reg.active || sw).postMessage(
-    { type: 'register', id, name, size, mime, port: channel.port2 },
-    [channel.port2],
-  );
+  // Stream the staged file into a fresh SW download. Runs once, at completion.
+  const deliver = async () => {
+    await writable.close();
+    const reg = sinkState.serviceWorkerRegistration;
+    const sw = reg && (reg.active || reg.waiting || reg.installing);
+    if (!sw) throw new Error('Service Worker not available.');
 
-  await ready;
+    const channel = new MessageChannel();
+    let sinkRef = null;
+    const ready = new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Service Worker did not respond.')), 5000);
+      channel.port1.onmessage = (ev) => {
+        if (ev.data?.type === 'ready') {
+          clearTimeout(timeout);
+          resolve();
+        } else if (ev.data?.type === 'cancel') {
+          // User cancelled the browser download — call this sink's onCancel hook (if any).
+          if (sinkRef && typeof sinkRef._onCancel === 'function') sinkRef._onCancel();
+        }
+      };
+    });
 
-  // Trigger the download by navigating a hidden iframe to the intercepted URL.
-  // Iframe is more reliable than window.open() (no popup blocker) and gives Safari
-  // a navigation event the SW can intercept.
-  const iframe = document.createElement('iframe');
-  iframe.hidden = true;
-  iframe.src = `/__download/${encodeURIComponent(id)}`;
-  document.body.appendChild(iframe);
+    (reg.active || sw).postMessage(
+      { type: 'register', id, name, size, mime, port: channel.port2 },
+      [channel.port2],
+    );
+    await ready;
 
-  // Keep the Service Worker alive during long, slow, or backpressured transfers.
-  // Browsers terminate idle SWs aggressively; an active streaming Response keeps it
-  // alive while bytes are flowing, but on slow disks or very large files bytes can
-  // pause for tens of seconds. A no-op message on a known port resets the SW's idle
-  // clock without doing any work; the SW's `message` handler ignores unknown types.
-  const swTarget = reg.active || sw;
-  const keepalive = setInterval(() => {
-    try { swTarget.postMessage({ type: 'keepalive', id }); } catch {}
-  }, 20_000);
+    // Trigger the download by navigating a hidden iframe to the intercepted URL.
+    const iframe = document.createElement('iframe');
+    iframe.hidden = true;
+    iframe.src = `/__download/${encodeURIComponent(id)}`;
+    document.body.appendChild(iframe);
 
-  const port = channel.port1;
-  sink = {
+    const port = channel.port1;
+    const stagedFile = await handle.getFile();
+    const reader = stagedFile.stream().getReader();
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      const buf = value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength);
+      port.postMessage(buf, [buf]);
+    }
+    port.postMessage({ type: 'end' });
+    port.close();
+    setTimeout(() => iframe.remove(), 1000);
+    cleanupStaging();
+  };
+
+  return {
     mode: 'sw',
     // Callers (user.downloadFile / user.downloadAll) assign a callback here so that a
-    // browser-side cancel (closing the download tray, deleting the in-progress entry)
-    // aborts the WebRTC transfer instead of leaving the sender pumping bytes into a
-    // dead stream.
+    // browser-side cancel aborts the transfer instead of leaving it running.
     _onCancel: null,
-    async write(chunk) {
-      // MessageChannel auto-buffers; we still throttle via the caller's backpressure
-      // on the WebRTC side, which keeps memory bounded.
-      const buf = chunk.buffer
-        ? chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength)
-        : chunk;
-      port.postMessage(buf, [buf]);
-    },
-    async close() {
-      clearInterval(keepalive);
-      port.postMessage({ type: 'end' });
-      port.close();
-      setTimeout(() => iframe.remove(), 1000);
-    },
+    async write(chunk) { await writable.write(chunk); },
+    async truncate0() { await writable.truncate(0); },
+    async close() { await deliver(); },
     async abort(reason) {
-      clearInterval(keepalive);
-      try { port.postMessage({ type: 'abort', reason: reason ? String(reason) : 'aborted' }); } catch {}
-      try { port.close(); } catch {}
-      setTimeout(() => iframe.remove(), 250);
+      try { await writable.close(); } catch {}
+      try { await root.removeEntry(stagingName); } catch {}
     },
   };
-  return sink;
 }
 
 // ---- Blob (legacy) sink -------------------------------------------------------------
@@ -284,6 +288,7 @@ function openBlobSink({ name, mime }) {
       // Copy into a stable Uint8Array reference (the caller may reuse the buffer).
       chunks.push(new Uint8Array(chunk));
     },
+    async truncate0() { chunks.length = 0; },
     async close() {
       const blob = new Blob(chunks, mime ? { type: mime } : undefined);
       chunks.length = 0;

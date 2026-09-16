@@ -121,8 +121,8 @@ class DataConnection extends EventEmitter {
 
   // ---- Connection lifecycle ------------------------------------------------------------
 
-  async _initOutbound(iceServers) {
-    this._pc = new RTCPeerConnection({ iceServers });
+  async _initOutbound(rtcConfig) {
+    this._pc = new RTCPeerConnection(rtcConfig);
     this._wireRtcEvents();
 
     // The originator creates the data channel BEFORE creating the offer so that the
@@ -150,8 +150,8 @@ class DataConnection extends EventEmitter {
     });
   }
 
-  async _initInbound(iceServers, offerPayload) {
-    this._pc = new RTCPeerConnection({ iceServers });
+  async _initInbound(rtcConfig, offerPayload) {
+    this._pc = new RTCPeerConnection(rtcConfig);
     this._wireRtcEvents();
 
     // The answerer doesn't create the channel — it appears via ondatachannel.
@@ -321,13 +321,15 @@ class DataConnection extends EventEmitter {
   }
 
   close() {
-    if (this._closed) return;
+    const firstClose = !this._closed;
     this._closed = true;
     this._open = false;
     // Best-effort polite goodbye; the peer doesn't strictly need it.
-    if (this._peer && !this._peer.destroyed) {
+    if (firstClose && this._peer && !this._peer.destroyed) {
       this._peer._sendSignal(this._remoteId, { kind: 'close', connectionId: this._connectionId });
     }
+    // Always tear down the transport, even when the remote closed first (the dc
+    // 'close' handler sets _closed) — otherwise the RTCPeerConnection leaks.
     if (this._dc) {
       try { this._dc.onopen = this._dc.onmessage = this._dc.onclose = this._dc.onerror = null; } catch {}
       try { this._dc.close(); } catch {}
@@ -337,7 +339,7 @@ class DataConnection extends EventEmitter {
       try { this._pc.close(); } catch {}
     }
     if (this._peer) this._peer._unregisterConnection(this);
-    this.emit('close');
+    if (firstClose) this.emit('close');
   }
 }
 
@@ -357,7 +359,9 @@ class Peer extends EventEmitter {
     super();
     this._id = id;
     this._opts = opts;
-    this._iceServers = (opts.config && opts.config.iceServers) || [];
+    // Full RTCConfiguration (iceServers + iceTransportPolicy etc.) — callers like
+    // mode.js set policy here, so it must reach the RTCPeerConnection verbatim.
+    this._rtcConfig = (opts.config && typeof opts.config === 'object') ? opts.config : {};
     this._wsUrl = this._buildSignalUrl(opts);
     this._ws = null;
     this._destroyed = false;
@@ -543,7 +547,7 @@ class Peer extends EventEmitter {
       // Wire up 'open' notification to the Peer's 'connection' event, matching PeerJS.
       // Existing FileSync code subscribes to 'connection' and then to conn.on('open').
       this.emit('connection', conn);
-      await conn._initInbound(this._iceServers, payload);
+      await conn._initInbound(this._rtcConfig, payload);
       return;
     }
 
@@ -616,7 +620,7 @@ class Peer extends EventEmitter {
     });
     this._connections.set(conn.connectionId, conn);
     // Fire-and-forget; SDP exchange happens asynchronously.
-    conn._initOutbound(this._iceServers).catch((err) => {
+    conn._initOutbound(this._rtcConfig).catch((err) => {
       conn.emit('error', makeError('webrtc', err && err.message || String(err)));
     });
     return conn;

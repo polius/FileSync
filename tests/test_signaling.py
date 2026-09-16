@@ -1,5 +1,6 @@
 import pytest
 
+from api import signaling
 from api.signaling import (
     _client_host_hint,
     _is_private_or_loopback,
@@ -96,12 +97,20 @@ class TestRewriteCandidateLine:
 
 
 class TestMaybeRewriteSignalPayload:
-    def test_rewrites_private_relay_candidate(self):
+    def test_rewrites_private_relay_candidate(self, monkeypatch):
+        # Hostnames must be resolved to a literal: Chrome rejects ICE candidates whose
+        # connection-address is an FQDN.
+        monkeypatch.setattr(signaling, "_resolve_host", lambda host: "203.0.113.9")
         payload = {"kind": "candidate", "candidate": {"candidate": RELAY_PRIVATE, "address": "172.18.0.2"}}
         out = _maybe_rewrite_signal_payload(payload, _FakeWS("filesync.example.com:443"))
         assert out is not payload  # cloned, sender's view untouched
-        assert "filesync.example.com 50000" in out["candidate"]["candidate"]
-        assert out["candidate"]["address"] == "filesync.example.com"
+        assert "203.0.113.9 50000" in out["candidate"]["candidate"]
+        assert out["candidate"]["address"] == "203.0.113.9"
+
+    def test_leaves_candidate_alone_when_hostname_unresolvable(self, monkeypatch):
+        monkeypatch.setattr(signaling, "_resolve_host", lambda host: None)
+        payload = {"kind": "candidate", "candidate": {"candidate": RELAY_PRIVATE, "address": "172.18.0.2"}}
+        assert _maybe_rewrite_signal_payload(payload, _FakeWS("filesync.example.com:443")) is payload
 
     def test_leaves_public_relay_candidate_alone(self):
         payload = {"kind": "candidate", "candidate": {"candidate": RELAY_PUBLIC, "address": "93.184.216.34"}}

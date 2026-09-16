@@ -2,6 +2,7 @@ import os
 import re
 import time
 import json
+import socket
 import asyncio
 import logging
 import ipaddress
@@ -189,6 +190,41 @@ def _client_host_hint(ws: WebSocket) -> Optional[str]:
     return host or None
 
 
+# Resolution cache for client host headers (hostname -> IPv4). Single-worker event
+# loop, few relay candidates per connection: a plain dict is enough.
+_host_resolutions: Dict[str, Optional[str]] = {}
+
+
+def _resolve_host(host: str) -> Optional[str]:
+    """Resolve a hostname to an IPv4 literal for ICE candidate rewriting. Returns None
+    when the host is already an IP literal or cannot be resolved."""
+    if host in _host_resolutions:
+        return _host_resolutions[host]
+    result: Optional[str] = None
+    try:
+        infos = socket.getaddrinfo(host, None, family=socket.AF_INET, type=socket.SOCK_DGRAM)
+        if infos:
+            result = infos[0][4][0]
+    except OSError:
+        result = None
+    _host_resolutions[host] = result
+    return result
+
+
+def _candidate_target_address(ws: WebSocket) -> Optional[str]:
+    """The relay address the target client can route to: the IP it used to reach this
+    server. Chrome rejects ICE candidates whose connection-address is a hostname, so
+    the Host header must be resolved to a literal before substitution."""
+    host = _client_host_hint(ws)
+    if not host:
+        return None
+    try:
+        ipaddress.ip_address(host)
+        return host  # already an IP literal
+    except ValueError:
+        return _resolve_host(host)
+
+
 def _rewrite_candidate_line(line: str, new_addr: str) -> str:
     """Substitute the connection-address and any raddr in a candidate line."""
     m = _CANDIDATE_RE.match(line)
@@ -228,7 +264,7 @@ def _maybe_rewrite_signal_payload(payload, target_ws: WebSocket):
     if not _is_private_or_loopback(current_addr):
         return payload  # already a routable address; trust it
 
-    new_host = _client_host_hint(target_ws)
+    new_host = _candidate_target_address(target_ws)
     if not new_host or new_host == current_addr:
         return payload
 

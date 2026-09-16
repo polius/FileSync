@@ -35,6 +35,18 @@ const _sanitizeFilename = (s) => {
 // receivers are told they're waiting.
 const _OUTBOUND_CONCURRENCY_CAP = 5;
 
+// Room-connection liveness. Same policy as the per-file watchdog in file.js: browsers
+// keep retrying a 'disconnected' ICE session for ~30s, so don't declare the room dead
+// before ICE itself does.
+const _ICE_DISCONNECT_GRACE_MS = 30_000;
+
+// Auto-resume of interrupted downloads (receiver side). Attempts run with exponential
+// backoff; when they run out, the row switches to a manual "Resume" state and every
+// click on the download button makes one more attempt.
+const _RESUME_MAX_ATTEMPTS = 5;
+const _RESUME_ATTEMPT_TIMEOUT_MS = 15_000;
+const _RESUME_INIT_TIMEOUT_MS = 15_000;
+
 // _files/_remotePeers are keyed by wire-supplied ids, and the signaling charset
 // allows '__proto__'. Null-prototype objects keep a crafted id from resolving to
 // Object.prototype members.
@@ -177,19 +189,35 @@ export class User {
     })
   }
 
+  // Track ICE transitions with events; interval ticks are throttled in background tabs.
+  _watchIce(conn, entry) {
+    const pc = conn.peerConnection;
+    if (!pc || typeof pc.addEventListener !== 'function') return;
+    entry.iceState = pc.iceConnectionState;
+    if (entry.iceState === 'disconnected') entry.disconnectedSince = Date.now();
+    pc.addEventListener('iceconnectionstatechange', () => {
+      entry.iceState = pc.iceConnectionState;
+      entry.disconnectedSince = entry.iceState === 'disconnected'
+        ? (entry.disconnectedSince || Date.now())
+        : null;
+    });
+  }
+
   _isAlive(peer_id) {
     const peer = this._remotePeers[peer_id];
     if (peer === undefined) return;
     const pc = peer.conn ? peer.conn.peerConnection : null;
-    const state = pc ? pc.iceConnectionState : null;
+    const state = peer.iceState ?? (pc ? pc.iceConnectionState : null);
     // 'failed'/'closed' (and a null pc) are terminal. 'disconnected' is often transient
-    // and can recover, so only treat it as gone after a short grace window — otherwise a
-    // brief blip would drop a peer that WebRTC would have reconnected on its own.
-    peer.disconnectedSince = state === 'disconnected' ? (peer.disconnectedSince || Date.now()) : null;
-    const gaveUp = peer.disconnectedSince && (Date.now() - peer.disconnectedSince) > 4000;
+    // and can recover, so only treat it as gone after the full ICE grace window.
+    const gaveUp = state === 'disconnected'
+      && peer.disconnectedSince
+      && (Date.now() - peer.disconnectedSince) > _ICE_DISCONNECT_GRACE_MS;
     if (pc === null || state === 'failed' || state === 'closed' || gaveUp) {
       clearInterval(peer.interval);
       peer.interval = null;
+      // The room connection is really gone: close it so state matches the UI.
+      try { peer.conn.close(); } catch {}
       this._handleClose(peer.conn);
     }
   }
@@ -402,13 +430,26 @@ export class User {
     //      iterator (_zip=true, _zipController set). A second sink would be opened but
     //      never written to (_onChunk routes to the zip controller), leaking a save
     //      dialog or SW iframe.
-    if (file.in_progress || this._downloadAll?.active) {
+    if (file.in_progress || file._resuming || this._downloadAll?.active) {
       showToast('This file is already downloading.', 'warning');
       return;
     }
 
     // Clear any abort state from a prior attempt so this fresh download starts clean.
     file._aborted = false;
+
+    // Resume path: an interrupted download still holds its sink and the bytes received
+    // so far — continue where it stopped instead of starting over.
+    if (file.canResume) {
+      file.in_progress = true;
+      this._setRowState(file.id, { loading: true, abort: true });
+      this._resetResumeButton(file.id);
+      const pct = this._resumePercent(file);
+
+      this._setFileProgressText(file.id, `${pct}% | `);
+      this._sendDownloadRequest(file);
+      return;
+    }
 
     // Open the sink first, inside the user-gesture window. All sink modes are opened
     // here, before any WebRTC work:
@@ -447,6 +488,9 @@ export class User {
     // sender disconnects before the transfer header arrives.
     file.in_progress = true;
 
+    // Mid-transfer interruptions pause the download (sink kept) and land here.
+    file._onInterrupted = () => this._handleFileInterrupted(file);
+
     // Update UI: Remove Download button and add loading icon
     document.getElementById(`file-${fileId}-download`).style.display = 'none'
     document.getElementById(`file-${fileId}-error`).innerHTML = ''
@@ -470,20 +514,46 @@ export class User {
     }
 
     // If it's the host redirect the request to the Origin's Peer. Otherwise send the request to the Host.
+    this._sendDownloadRequest(file);
+  }
+
+  // Route the download (or resume) request to the sender: the host relays to the
+  // owner, a guest sends to the host. resume_offset > 0 asks the sender to continue
+  // an interrupted transfer from that byte.
+  _sendDownloadRequest(file) {
     const target = this._remotePeers[this._isHost ? file.owner_id : this._room_id];
     if (!target || !target.conn) {
       // The owner/host vanished between the click and the send — roll back cleanly
       // instead of throwing on a missing connection.
-      console.warn('downloadFile: routing peer is gone for file', fileId);
-      this._abortDownloadStart(file, fileId, 'The sender is no longer connected. Please try again.');
-      return;
+      console.warn('downloadFile: routing peer is gone for file', file.id);
+      this._abortDownloadStart(file, file.id, 'The sender is no longer connected. Please try again.');
+      return false;
     }
-    target.conn.send({'webrtc-file-download': {"file_id": fileId, "requester_id": this._peer.id, "requester_name": this._name, "peer_id": file.peer.id}})
+    target.conn.send({
+      'webrtc-file-download': {
+        file_id: file.id,
+        requester_id: this._peer.id,
+        requester_name: this._name,
+        peer_id: file.peer.id,
+        resume_offset: file.resumeOffset || 0,
+      },
+    });
+    return true;
   }
 
   // Roll back a download that failed before any bytes flowed: release the sink and
-  // per-file peer state, then restore the row UI with an error message.
+  // per-file peer state, then restore the row UI with an error message. If the
+  // download is resumable (interrupted earlier, sink still open), keep everything and
+  // surface a resumable failure instead.
   _abortDownloadStart(file, fileId, message) {
+    if (file.canResume) {
+      file.in_progress = false;
+      file._resuming = false;
+      this._showResumeAvailable(file);
+      const errEl = document.getElementById(`file-${fileId}-error`);
+      if (errEl) errEl.textContent = message;
+      return;
+    }
     if (file._sink) {
       file._sink.abort('start-failed').catch(() => {});
       file._sink = null;
@@ -502,6 +572,94 @@ export class User {
     if (dl) dl.style.display = 'block';
     if (abortEl) abortEl.style.display = 'none';
     if (loading) loading.style.display = 'none';
+  }
+
+  // ---- Interrupted-download resume (receiver side) ---------------------------------
+
+  _resumePercent(file) {
+    return file.size > 0 ? Math.floor((file.resumeOffset / file.size) * 100) : 0;
+  }
+
+  _resumeStillWanted(file) {
+    return !file.aborted && !file.removed && !file.zip && file.canResume;
+  }
+
+  _setRowState(fileId, { loading = false, failed = false, success = false, abort = false, download = false }) {
+    const set = (suffix, show) => {
+      const el = document.getElementById(`file-${fileId}-${suffix}`);
+      if (el) el.style.display = show ? 'block' : 'none';
+    };
+    set('icon-loading', loading);
+    set('icon-failed', failed);
+    set('icon-success', success);
+    set('abort', abort);
+    set('download', download);
+  }
+
+  _setFileProgressText(fileId, text) {
+    const el = document.getElementById(`file-${fileId}-progress`);
+    if (el) el.textContent = text;
+  }
+
+  _resetResumeButton(fileId) {
+    const dl = document.getElementById(`file-${fileId}-download`);
+    if (dl) dl.title = 'Download file';
+    const errEl = document.getElementById(`file-${fileId}-error`);
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+  }
+
+  // A download paused mid-transfer (connection interrupted, sink kept open). Try to
+  // re-establish it transparently with backoff; when the attempts run out, leave the
+  // row in a resumable state so the user can retry manually.
+  async _handleFileInterrupted(file) {
+    file._resuming = true;
+    const pct = this._resumePercent(file);
+    for (let attempt = 1; attempt <= _RESUME_MAX_ATTEMPTS; attempt++) {
+      if (!this._resumeStillWanted(file)) break;
+      if (attempt > 1) {
+        await new Promise((r) => setTimeout(r, Math.min(1000 * 2 ** (attempt - 2), 16000)));
+        if (!this._resumeStillWanted(file)) break;
+      }
+      this._setFileProgressText(file.id, `${pct}% | reconnecting… `);
+      file.cancelResumeAttempt();
+      try {
+        // The signaling socket itself may be down — bound the setup or the attempt
+        // would hang instead of rolling over to the next one.
+        await Promise.race([
+          file.init(),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('init timeout')), _RESUME_INIT_TIMEOUT_MS)),
+        ]);
+      } catch { continue; }
+      if (!this._resumeStillWanted(file)) break;
+      if (!this._sendDownloadRequest(file)) continue;
+
+      // Wait until the sender re-connects and the resumed header is accepted, or the
+      // attempt times out (the room link may be down for a while — that's fine, the
+      // next attempt retries).
+      const deadline = Date.now() + _RESUME_ATTEMPT_TIMEOUT_MS;
+      let resumed = false;
+      while (Date.now() < deadline) {
+        if (file.in_progress && file.conn) { resumed = true; break; }
+        if (!this._resumeStillWanted(file)) break;
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      if (resumed) { file._resuming = false; return; }
+    }
+    file._resuming = false;
+    if (this._resumeStillWanted(file)) this._showResumeAvailable(file);
+  }
+
+  // Terminal-but-resumable row state: bytes are kept, the download button retries.
+  _showResumeAvailable(file) {
+    const pct = this._resumePercent(file);
+    this._setRowState(file.id, { failed: true });
+    this._resetResumeButton(file.id);
+    this._setFileProgressText(file.id, `${pct}% | `);
+    const errEl = document.getElementById(`file-${file.id}-error`);
+    if (errEl) {
+      errEl.style.display = 'block';
+      errEl.textContent = 'The connection was interrupted. Click download to try again.';
+    }
   }
 
   // Abort a file that is already being downloaded
@@ -837,6 +995,7 @@ export class User {
 
       // Store Host Peer connection
       this._remotePeers[conn.peer] = {"conn": conn, "interval": setInterval(() => this._isAlive(conn.peer), 1000)}
+      this._watchIce(conn, this._remotePeers[conn.peer])
 
       // Send credentials to the host to authenticate
       if (!this._password) {
@@ -874,6 +1033,7 @@ export class User {
         if (prev?.interval) clearInterval(prev.interval);
 
         this._remotePeers[conn.peer] = {"name": cleanName, "conn": conn,  "interval": setInterval(() => this._isAlive(conn.peer), 1000)}
+        this._watchIce(conn, this._remotePeers[conn.peer])
 
         // Show peer connected status
         dom.transfer_status_wait.style.display = 'none'
@@ -1204,9 +1364,12 @@ export class User {
     file.transfer(data)
       .catch((err) => {
         console.warn('Outbound transfer failed for', data?.file_id, '-', err?.message || err);
-        // Tell the requester over the room connection. The per-file DataChannel may
-        // never have opened, so this is the only path that reaches their UI.
-        this._notifyRequesterCancel(data);
+        // Tell the requester over the room connection — but only when the per-file
+        // DataChannel never carried a header. Afterwards the receiver sees close/
+        // cancel frames on the channel itself, and a room-level cancel here would
+        // race with its own pause/resume bookkeeping.
+        const senderEntry = file._remotePeers?.[data?.peer_id];
+        if (!senderEntry || !senderEntry.headerSent) this._notifyRequesterCancel(data);
         // Best-effort: tear down any per-receiver state file.transfer set up before it
         // failed, so we don't leak the signaling WebSocket attached to the per-file Peer.
         const entry = file._remotePeers?.[data?.peer_id];
@@ -1290,6 +1453,9 @@ export class User {
     if (data.requester_id == this._peer.id) {
       const file = this._files[data.file_id];
       if (!file || !file.in_progress) return;
+      // An interrupted download is managed by its pause/resume cycle — don't tear it
+      // down from here (this cancel is about transfers that never started).
+      if (file._resuming || file.canResume) return;
       file._terminateReceive(file._conn, 'sender-cancel', 'The sender stopped the transfer.');
       return;
     }
