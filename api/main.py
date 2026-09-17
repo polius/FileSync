@@ -6,7 +6,7 @@ import base64
 import uuid
 import jwt
 from datetime import datetime, timedelta, timezone
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.signaling import router as signaling_router
@@ -64,9 +64,25 @@ async def health_check():
 async def uuid_check():
     return {"uuid": str(uuid.uuid4())}
 
+# The endpoint below is intentionally unauthenticated (this app has no user accounts to
+# gate on), so a per-client sliding-window limit bounds how many relay credentials any
+# single caller can mint, mitigating unauthorized TURN-relay abuse by anonymous clients.
+_CRED_RATE_LIMIT = 10       # max credential requests
+_CRED_RATE_WINDOW = 60.0    # per this many seconds, per client IP
+_cred_requests: dict[str, list[float]] = {}
+
 # Add credentials route
 @app.get("/credentials")
-async def credentials():
+async def credentials(request: Request):
+    # Enforce the per-client rate limit before minting any credential.
+    now = time.monotonic()
+    client_ip = request.client.host if request.client else "unknown"
+    recent = [t for t in _cred_requests.get(client_ip, []) if t >= now - _CRED_RATE_WINDOW]
+    if len(recent) >= _CRED_RATE_LIMIT:
+        raise HTTPException(status_code=429, detail="Too many credential requests.")
+    recent.append(now)
+    _cred_requests[client_ip] = recent
+
     # Define TTL (5 minutes)
     ttl = 300
 
