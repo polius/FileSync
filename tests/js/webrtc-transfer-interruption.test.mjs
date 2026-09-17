@@ -7,7 +7,9 @@
 //      sends a 'cancel' frame and closes the channel; the receiver PAUSES (keeps the
 //      sink + resume offset) instead of hanging in_progress forever.
 //   2. Receiver stall watchdog: no inbound frames mid-transfer => pause + resume point.
-//   3. Zip mode keeps the old terminate-on-close behavior (zip is not resumable).
+//   3. Zip bundles pause mid-entry and resume into the SAME stream (byte continuity,
+//      no gaps/dupes); without a live stream, or on a from-zero restart mid-entry,
+//      they fail terminally as before.
 //   4. Resume handshake: a new transfer with resume_offset continues at the durable
 //      byte count and finalizes the full file — no duplicate/missing bytes.
 //   5. Fresh-restart fallback: a sender without offset support resets the sink.
@@ -289,18 +291,62 @@ test('receiver stall watchdog: silence mid-transfer pauses the download with a r
   try { senderFile._peer.destroy(); } catch {}
 });
 
-test('zip mode: channel close mid-transfer still terminates with "The connection was lost."', async () => {
-  let errored = null;
-  const controller = { enqueue() {}, close() {}, error(e) { errored = e; } };
-  const receiverFile = new File({ id: FILE_ID, name: 'report.bin', size: FILE_SIZE, owner_id: SENDER_PEER, owner_name: 'S' });
-  receiverFile.zip = true;
-  receiverFile.setZipController(controller);
-  receiverFile.in_progress = true;
+// Zip bundle stand-in for the ReadableStreamController user.js hands to the File.
+function makeZipController() {
+  const c = { parts: [], bytes: 0, closes: 0, errored: null };
+  return {
+    _c: c,
+    enqueue(b) { c.parts.push(Buffer.from(b)); c.bytes += b.byteLength; },
+    close() { c.closes += 1; },
+    error(e) { c.errored = e ?? 'errored'; },
+  };
+}
+
+function makeZipReceiver(controller, { stallTimeoutMs } = {}) {
+  const f = new File({ id: FILE_ID, name: 'report.bin', size: FILE_SIZE, owner_id: SENDER_PEER, owner_name: 'S' });
+  f.zip = true;
+  f.setZipController(controller);
+  f.in_progress = true;
+  if (stallTimeoutMs) f._stallTimeoutMs = stallTimeoutMs;
+  f._onInterrupted = async () => {}; // bundle wiring (quiesce + retry loop) lives in user.js
+  return f;
+}
+
+test('zip bundle: receiver stall pauses mid-entry and keeps the zip stream open for resume', async () => {
+  const zip = makeZipController();
+  const receiverFile = makeZipReceiver(zip, { stallTimeoutMs: 80 });
+
+  // Sender loop hangs after the first chunk — the link is silently dead.
+  const senderFile = await makeSenderFile({ gateAfter: 1 });
+  const { senderDC, receiverConn } = await startTransfer(senderFile, receiverFile, new FakeReceiverConn());
+
+  await settle(400); // > stall timeout
+  assert.equal(receiverFile.in_progress, false, 'stall watchdog paused the bundle file');
+  assert.equal(receiverFile.canResume, true, 'bundle file is resumable');
+  assert.ok(receiverFile.resumeOffset > 0 && receiverFile.resumeOffset % (16 * 1024) === 0);
+  assert.equal(receiverFile.resumeOffset, zip._c.bytes, 'resume point = bytes handed to client-zip');
+  assert.equal(zip._c.errored, null, 'zip stream kept open across the pause');
+  assert.equal(zip._c.closes, 0, 'zip entry not finalized');
+  assert.equal(receiverConn.closeCalls >= 1, true, 'paused connection was closed');
+
+  // User discards the paused file: the zip stream is killed, resume state cleared.
+  receiverFile.abort();
+  await settle(50);
+  assert.ok(zip._c.errored, 'zip stream errored on discard');
+  assert.equal(receiverFile.canResume, false, 'resume state cleared');
+  assert.equal(receiverFile._resumeOffset, 0);
+
+  if (senderFile._remotePeers[RECEIVER_PEER]?.interval) clearInterval(senderFile._remotePeers[RECEIVER_PEER].interval);
+  try { senderFile._peer.destroy(); } catch {}
+});
+
+test('zip bundle: channel close with no live stream still terminates (bundle already dead)', async () => {
+  const receiverFile = makeZipReceiver(makeZipController());
+  receiverFile.setZipController(null); // e.g. the bundle was torn down already
 
   const senderFile = await makeSenderFile();
-  const { promise, senderDC } = await startTransfer(senderFile, receiverFile, new FakeReceiverConn());
+  const { senderDC, promise } = await startTransfer(senderFile, receiverFile, new FakeReceiverConn());
   promise.catch(() => {}); // ends in channel-closed/send-failed by design
-
   await settle(300);
   assert.ok(receiverFile._transferred > 0 && receiverFile._transferred < FILE_SIZE);
   senderDC.close();
@@ -308,7 +354,6 @@ test('zip mode: channel close mid-transfer still terminates with "The connection
   await settle(50);
 
   assert.equal(receiverFile.in_progress, false, 'zip download terminated');
-  assert.ok(errored, 'zip stream errored');
   const errEl = document.getElementById(`file-${FILE_ID}-error`);
   assert.equal(errEl.textContent, 'The connection was lost.');
 
@@ -324,6 +369,104 @@ function receiverConnClose(receiverFile) {
   receiverFile._conn = conn;
   receiverFile._handleClose(conn);
 }
+
+test('zip bundle resume: a new connection continues at the offset into the SAME stream', async () => {
+  const zip = makeZipController();
+  const receiverFile = makeZipReceiver(zip);
+
+  // Session 1: some chunks flow, then the channel dies -> pause.
+  const sender1 = await makeSenderFile();
+  const s1 = await startTransfer(sender1, receiverFile, new FakeReceiverConn());
+  s1.promise.catch(() => {}); // session 1 ends abnormally by design
+  await settle(300);
+  const offset = receiverFile._flushed;
+  assert.ok(offset > 0 && offset % (16 * 1024) === 0, 'some whole chunks handed to client-zip before the interruption');
+  assert.equal(offset, zip._c.bytes, 'flushed count tracks bytes handed to client-zip');
+  s1.senderDC.close();
+  s1.receiverConn.close();
+  await settle(100);
+  assert.equal(receiverFile.resumeOffset, offset, 'pause recorded the resume point');
+  assert.equal(zip._c.errored, null, 'stream survives the pause');
+  if (sender1._remotePeers[RECEIVER_PEER]?.interval) clearInterval(sender1._remotePeers[RECEIVER_PEER].interval);
+  try { sender1._peer.destroy(); } catch {}
+
+  // Session 2: fresh sender asked to resume at that offset, same controller.
+  const sender2 = await makeSenderFile();
+  const s2 = await startTransfer(sender2, receiverFile, new FakeReceiverConn(), { resumeOffset: offset });
+  await s2.promise; // completes normally
+  await settle(100);
+
+  const header = headerOf(s2.senderDC);
+  assert.equal(header.offset, offset, 'sender honored the resume offset');
+  assert.equal(receiverFile._transferred, FILE_SIZE, 'receiver counted offset + resumed bytes');
+  assert.equal(zip._c.closes, 1, 'zip entry closed exactly once, at the end');
+  assert.equal(zip._c.errored, null, 'zip stream never errored');
+  assert.equal(zip._c.bytes, FILE_SIZE, 'no gaps, no duplicates across the resume');
+  const got = Buffer.concat(zip._c.parts);
+  const expected = Buffer.from(makeContent()._data);
+  assert.ok(got.equals(expected), 'byte stream into client-zip is byte-exact');
+  assert.equal(receiverFile.resumeOffset, 0, 'resume state cleared');
+
+  if (sender2._remotePeers[RECEIVER_PEER]?.interval) clearInterval(sender2._remotePeers[RECEIVER_PEER].interval);
+  try { sender2._peer.destroy(); } catch {}
+});
+
+test('zip bundle: a from-zero restart mid-entry terminates (client-zip cannot be rewound)', async () => {
+  const zip = makeZipController();
+  const receiverFile = makeZipReceiver(zip);
+
+  const sender1 = await makeSenderFile();
+  const s1 = await startTransfer(sender1, receiverFile, new FakeReceiverConn());
+  s1.promise.catch(() => {});
+  await settle(300);
+  s1.senderDC.close();
+  s1.receiverConn.close();
+  await settle(100);
+  assert.ok(receiverFile.resumeOffset > 0);
+  if (sender1._remotePeers[RECEIVER_PEER]?.interval) clearInterval(sender1._remotePeers[RECEIVER_PEER].interval);
+  try { sender1._peer.destroy(); } catch {}
+
+  // Session 2: legacy sender ignores resume_offset entirely -> header carries no offset.
+  const sender2 = await makeSenderFile();
+  const s2 = await startTransfer(sender2, receiverFile, new FakeReceiverConn());
+  s2.promise.catch(() => {});
+  await settle(200);
+
+  const header = headerOf(s2.senderDC);
+  assert.equal(header.offset, 0, 'legacy header carries no offset');
+  assert.ok(zip._c.errored, 'zip stream errored — bundle failed cleanly');
+  assert.equal(receiverFile.canResume, false, 'no zombie resume against a rewound stream');
+
+  if (sender2._remotePeers[RECEIVER_PEER]?.interval) clearInterval(sender2._remotePeers[RECEIVER_PEER].interval);
+  try { sender2._peer.destroy(); } catch {}
+});
+
+test('zip bundle: a mismatched resume offset terminates instead of corrupting the stream', async () => {
+  const zip = makeZipController();
+  const receiverFile = makeZipReceiver(zip);
+
+  const sender1 = await makeSenderFile();
+  const s1 = await startTransfer(sender1, receiverFile, new FakeReceiverConn());
+  s1.promise.catch(() => {});
+  await settle(300);
+  const offset = receiverFile.resumeOffset;
+  s1.senderDC.close();
+  s1.receiverConn.close();
+  await settle(100);
+  if (sender1._remotePeers[RECEIVER_PEER]?.interval) clearInterval(sender1._remotePeers[RECEIVER_PEER].interval);
+  try { sender1._peer.destroy(); } catch {}
+
+  const sender2 = await makeSenderFile();
+  const s2 = await startTransfer(sender2, receiverFile, new FakeReceiverConn(), { resumeOffset: offset - 16 * 1024 });
+  s2.promise.catch(() => {});
+  await settle(200);
+
+  assert.ok(zip._c.errored, 'zip stream errored on resume-mismatch');
+  assert.equal(receiverFile.canResume, false);
+
+  if (sender2._remotePeers[RECEIVER_PEER]?.interval) clearInterval(sender2._remotePeers[RECEIVER_PEER].interval);
+  try { sender2._peer.destroy(); } catch {}
+});
 
 test('resume handshake: new transfer with resume_offset continues at the durable byte count', async () => {
   const sink = makeSink();

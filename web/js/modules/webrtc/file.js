@@ -90,7 +90,7 @@ export class File {
   get conn() { return this._conn }
   get remotePeers() { return this._remotePeers }
   get resumeOffset() { return this._resumeOffset }
-  get canResume() { return !this._zip && !!this._sink && this._resumeOffset > 0 }
+  get canResume() { return (this._zip ? !!this._zipController : !!this._sink) && this._resumeOffset > 0 }
 
   get details() {
     return Object.values(this._remotePeers).reduce((acc, p) => {
@@ -383,6 +383,10 @@ export class File {
       const chain = (this._writeChain || Promise.resolve()).catch(() => {});
       this._writeChain = chain.then(() => sink.abort('aborted')).catch(() => {});
     }
+    if (this._zip && this._zipController) {
+      try { this._zipController.error(new Error('discarded')); } catch {}
+      this._zipController = null;
+    }
     try { if (this._peer) this._peer.destroy(); } catch {}
     this._conn = null;
     this._in_progress = false;
@@ -502,13 +506,20 @@ export class File {
     }
 
     const offset = typeof header.offset === 'number' ? header.offset : 0;
-    const stale = this._resumeOffset > 0;  // sink holds bytes from an earlier attempt
+    const stale = this._resumeOffset > 0;  // bytes from an earlier attempt are committed
     if (offset > 0) {
-      if (this._zip || !this._sink || offset !== this._resumeOffset) {
+      const target = this._zip ? this._zipController : this._sink;
+      if (!target || offset !== this._resumeOffset) {
         this._terminateReceive(conn, 'resume-mismatch', 'The transfer could not be resumed.');
         return;
       }
-    } else if (stale && this._sink) {
+    } else if (stale) {
+      if (this._zip) {
+        // A bundle cannot absorb a from-zero restart mid-entry: earlier entries and
+        // client-zip's running CRC for this one are already committed downstream.
+        this._terminateReceive(conn, 'resume-mismatch', 'The transfer could not be resumed.');
+        return;
+      }
       // Sender restarted from zero (older sender or fresh attempt) — drop our bytes.
       try { await this._sink.truncate0(); } catch (err) {
         console.error('Sink reset failed:', err);
@@ -589,16 +600,20 @@ export class File {
     }
   }
 
-  // Receiver-side pause: the link died mid-transfer but the sink is healthy. Keep the
-  // sink and the durable byte count so a new connection can resume at _flushed; stop
-  // the sender pumping into the dead channel, then notify user.js to reconnect.
+  // Receiver-side pause: the link died mid-transfer but the output is healthy. Keep the
+  // sink (or, for bundles, the zip stream controller) and the byte count so a new
+  // connection can resume at _flushed; stop the sender pumping into the dead channel,
+  // then notify user.js to reconnect. For bundles _flushed counts bytes handed to
+  // client-zip, so _onInterrupted drains the zip pipeline before trusting it.
+  // _conn/_in_progress are cleared before conn.close(): peer.js emits 'close'
+  // synchronously and the handler must not re-enter and pause a second time.
   async _interrupt(conn, reason) {
     this._clearStall();
+    this._conn = null;
+    this._in_progress = false;
     try { conn.dataChannel.send(JSON.stringify({ type: 'abort', reason })); } catch {}
     try { conn.close(); } catch {}
     try { if (this._peer) this._peer.destroy(); } catch {}
-    this._conn = null;
-    this._in_progress = false;
     try { await this._writeChain; } catch {}
     this._resumeOffset = this._flushed;
     this._writeChain = Promise.resolve();
@@ -608,7 +623,7 @@ export class File {
   }
 
   _touch() {
-    if (!this._in_progress || this._zip) return;
+    if (!this._in_progress) return;
     this._clearStall();
     this._stallTimer = setTimeout(() => {
       this._stallTimer = null;
@@ -625,10 +640,6 @@ export class File {
 
   _onStall() {
     if (!this._in_progress || !this._conn) return;
-    if (this._zip) {
-      this._terminateReceive(this._conn, 'stall', 'The connection was interrupted.');
-      return;
-    }
     this._interrupt(this._conn, 'stall');
   }
 
@@ -648,7 +659,12 @@ export class File {
     // advances once a write completed — it is the only safe resume point.
     try {
       if (this._zip) {
-        if (this._zipController) this._zipController.enqueue(bytes);
+        // Bundle bytes count as flushed once handed to client-zip; the resume driver
+        // drains the zip pipeline (quiesce) before trusting _flushed as a resume point.
+        if (this._zipController) {
+          this._zipController.enqueue(bytes);
+          this._flushed += bytes.byteLength;
+        }
       } else if (this._sink) {
         const sink = this._sink;
         const size = bytes.byteLength;
@@ -687,7 +703,8 @@ export class File {
   async _onSenderCancel(conn, msg) {
     if (this._conn !== conn) return;
     const reason = msg && msg.reason;
-    if (!this._zip && this._sink && RESUMABLE_CANCEL_REASONS.has(reason)) {
+    const target = this._zip ? this._zipController : this._sink;
+    if (target && RESUMABLE_CANCEL_REASONS.has(reason)) {
       await this._interrupt(conn, `sender-${reason}`);
       return;
     }
@@ -778,7 +795,8 @@ export class File {
     // download is resumable; otherwise clean up fully — never leave a half-written
     // file or a dangling per-file Peer.
     if (this._transferred < this._size && this._in_progress) {
-      if (!this._zip && this._sink) {
+      const target = this._zip ? this._zipController : this._sink;
+      if (target) {
         this._interrupt(conn, 'connection-closed');
       } else {
         this._terminateReceive(conn, 'connection-closed', 'The connection was lost.');

@@ -23,14 +23,19 @@
 //   t4    coturn stopped for 45s and left down -> how long until the receiver shows
 //         an error vs the sender's 4s watchdog?
 //   t5    sender browser SIGKILLed mid-transfer -> receiver's detection latency
+//   zip   "Download all" bundle (2 files): receiver's network service SIGSTOP 20s
+//         while file 2 is mid-transfer -> transparent resume; final files.zip is
+//         unpacked and every member hash is compared against the source fixtures
 //
 // Usage:  node run.mjs --scenario=t2 [--sink=sw] [--ice=auto] [--size=419430400]
 //                      [--observe=60000] [--base-url=http://localhost:8080]
-// Requires: FileSync running (app + coturn), `npm install` done in e2e/.
+// Requires: FileSync running (app + coturn), `npm install` done in e2e/, `unzip`
+// on PATH for the zip scenario.
 
 import { chromium } from 'playwright';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -87,6 +92,16 @@ function networkServicePids(rootPid, table = procTable()) {
 }
 function signalPids(pids, sig) {
   for (const p of pids) { try { process.kill(p, sig); } catch {} }
+}
+
+async function freezeReceiverNetworkService(browserRootPid, freezeMs) {
+  const nsPids = networkServicePids(browserRootPid, procTable());
+  if (!nsPids.length) throw new Error('receiver network-service process not found');
+  mark('sigstop-receiver-network-service', { pids: nsPids, freezeMs });
+  signalPids(nsPids, 'SIGSTOP');
+  await timeout(freezeMs);
+  signalPids(nsPids, 'SIGCONT');
+  mark('sigcont-receiver-network-service');
 }
 
 // ---------- in-page instrumentation ----------
@@ -203,10 +218,46 @@ async function fixtureFor(size) {
   if (fs.existsSync(hp)) sha256 = (await fsp.readFile(hp, 'utf8')).trim();
   return { path: p, size, sha256 };
 }
+async function ensureFixture(size) {
+  const p = path.join(FIXTURES_DIR, `fixture-${size}.bin`);
+  const hp = p + '.sha256';
+  if (fs.existsSync(p) && fs.existsSync(hp)) return fixtureFor(size);
+  await fsp.mkdir(FIXTURES_DIR, { recursive: true });
+  const h = createHash('sha256');
+  const fd = fs.openSync(p, 'w');
+  let left = size;
+  while (left > 0) {
+    const n = Math.min(left, 1024 * 1024);
+    const buf = randomBytes(n);
+    fs.writeSync(fd, buf);
+    h.update(buf);
+    left -= n;
+  }
+  fs.closeSync(fd);
+  await fsp.writeFile(hp, h.digest('hex') + '\n');
+  return fixtureFor(size);
+}
 async function sha256File(p) {
   const h = createHash('sha256');
   for await (const chunk of fs.createReadStream(p, { highWaterMark: 1024 * 1024 })) h.update(chunk);
   return h.digest('hex');
+}
+
+// Unpack the delivered bundle and compare every member against its source fixture.
+async function verifyZipMembers(zipPath, fixtures) {
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'fszip-'));
+  try {
+    execFileSync('unzip', ['-o', '-q', zipPath, '-d', out], { stdio: 'pipe' });
+    return await Promise.all(fixtures.map(async (fx) => {
+      const name = path.basename(fx.path);
+      const member = path.join(out, name);
+      if (!fs.existsSync(member)) return { name, result: 'missing' };
+      const got = await sha256File(member);
+      return { name, size: (await fsp.stat(member)).size, result: got === fx.sha256 ? 'hash-match' : 'hash-mismatch' };
+    }));
+  } finally {
+    fs.rmSync(out, { recursive: true, force: true });
+  }
 }
 
 // ---------- session helpers ----------
@@ -227,8 +278,15 @@ async function newInstrumentedBrowser() {
 async function pair({ senderB, receiverB, qs }) {
   const sender = await senderB.ctx.newPage();
   const receiver = await receiverB.ctx.newPage();
-  sender.on('pageerror', (e) => console.log(`  [S pageerror] ${e.message}`));
-  receiver.on('pageerror', (e) => console.log(`  [R pageerror] ${e.message}`));
+  for (const [page, label] of [[sender, 'S'], [receiver, 'R']]) {
+    page.on('pageerror', (e) => console.log(`  [${label} pageerror] ${e.message}`));
+    page.on('console', (msg) => {
+      if (msg.type() === 'error' || msg.type() === 'warning') {
+        report.consoles.push({ t: Date.now(), label, type: msg.type(), text: msg.text().slice(0, 300) });
+        console.log(`  [${label} ${msg.type()}] ${msg.text().slice(0, 200)}`);
+      }
+    });
+  }
 
   await sender.goto(`${BASE_URL}/?${qs}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await sender.waitForSelector('#transfer-div', { state: 'visible', timeout: 30000 });
@@ -269,6 +327,20 @@ async function waitForReceiverProgress(receiver, pct, timeoutMs = 120000) {
   throw new Error(`receiver never reached ${pct}%`);
 }
 
+async function waitForModalProgress(receiver, pct, timeoutMs = 120000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const txt = await Promise.race([
+      receiver.evaluate(() => document.getElementById('download-modal-value')?.textContent ?? ''),
+      timeout(1500).then(() => null),
+    ]);
+    const m = txt && txt.match(/^(\d+)%/);
+    if (m && Number(m[1]) >= pct) return Number(m[1]);
+    await timeout(250);
+  }
+  throw new Error(`bundle progress never reached ${pct}%`);
+}
+
 // ---------- report helpers ----------
 const rel = (t, t0) => t - t0;
 function summarizeDc(rec) {
@@ -287,7 +359,7 @@ function summarizeDc(rec) {
 // ---------- scenarios ----------
 const T0 = Date.now();
 const log = (...a) => console.log(`[${((Date.now() - T0) / 1000).toFixed(1)}s]`, ...a);
-const report = { scenario: SCENARIO, baseUrl: BASE_URL, sink: SINK, ice: ICE, size: SIZE, events: [], samples: [] };
+const report = { scenario: SCENARIO, baseUrl: BASE_URL, sink: SINK, ice: ICE, size: SIZE, events: [], samples: [], consoles: [] };
 const mark = (msg, data = {}) => {
   const e = { t: Date.now(), msg, ...data };
   report.events.push(e);
@@ -332,6 +404,8 @@ async function main() {
   report.fixture = fixture;
   if (!fixture.sha256) fixture.sha256 = await sha256File(fixture.path);
   const qs = `sink=${SINK}&ice=${ICE}`;
+  const zipMode = SCENARIO === 'zip';
+  let zipFixtures = null;
 
   const senderB = await newInstrumentedBrowser();
   const receiverB = await newInstrumentedBrowser();
@@ -341,12 +415,33 @@ async function main() {
     const { sender, receiver } = await pair({ senderB, receiverB, qs });
     mark('paired');
 
-    const { downloadPromise } = await startTransfer({ sender, receiver, fixture });
-    mark('download-started');
+    let downloadPromise = null;
+    if (zipMode) {
+      // Bundle: one small file (finishes fast) + the big one — the interruption must
+      // land mid-entry of file 2 so the resume has to continue client-zip mid-stream.
+      const small = await ensureFixture(Math.min(8 * 1024 * 1024, Math.max(1024 * 1024, Math.floor(SIZE / 4))));
+      zipFixtures = [small, fixture];
+      report.fixtures = zipFixtures;
+      for (const f of zipFixtures) {
+        if (!f.sha256) f.sha256 = await sha256File(f.path);
+      }
+      downloadPromise = receiver.waitForEvent('download', { timeout: 300000 });
+      await sender.setInputFiles('#transfer-select-file-input', zipFixtures.map((f) => f.path));
+      await receiver.click('#transfer-files-download');
+      await receiver.waitForSelector('#download-modal', { state: 'visible', timeout: 30000 });
+      mark('download-all-started', { files: zipFixtures.map((f) => f.size) });
+      const threshold = Math.ceil((small.size / (small.size + fixture.size)) * 100) + 5;
+      const pct = await waitForModalProgress(receiver, threshold);
+      mark('interrupt-point', { modalProgress: pct });
+    } else {
+      const { downloadPromise: dp } = await startTransfer({ sender, receiver, fixture });
+      downloadPromise = dp;
+      mark('download-started');
 
-    // Mid-transfer trigger point.
-    const pct = await waitForReceiverProgress(receiver, 15);
-    mark('interrupt-point', { receiverProgress: pct });
+      // Mid-transfer trigger point.
+      const pct = await waitForReceiverProgress(receiver, 15);
+      mark('interrupt-point', { receiverProgress: pct });
+    }
 
     switch (SCENARIO) {
       case 't1': {
@@ -363,16 +458,11 @@ async function main() {
         break;
       }
       case 't2': {
-        const rpid = receiverB.rootPid;
-        const table = procTable();
-        const nsPids = networkServicePids(rpid, table);
-        if (!nsPids.length) throw new Error('receiver network-service process not found');
-        const freezeMs = Number(argv['freeze-ms'] || 10000);
-        mark('sigstop-receiver-network-service', { pids: nsPids, freezeMs });
-        signalPids(nsPids, 'SIGSTOP');
-        await timeout(freezeMs);
-        signalPids(nsPids, 'SIGCONT');
-        mark('sigcont-receiver-network-service');
+        await freezeReceiverNetworkService(receiverB.rootPid, Number(argv['freeze-ms'] || 10000));
+        break;
+      }
+      case 'zip': {
+        await freezeReceiverNetworkService(receiverB.rootPid, Number(argv['freeze-ms'] || 20000));
         break;
       }
       case 't3':
@@ -422,12 +512,16 @@ async function main() {
         timeout(5000).then(() => null),
       ]);
       if (dlPath && fs.existsSync(dlPath)) {
-        const sz = (await fsp.stat(dlPath)).size;
-        dlCheck = { size: sz, complete: sz === fixture.size };
-        if (sz === fixture.size) {
-          const got = await sha256File(dlPath);
-          dlCheck.hashMatch = got === fixture.sha256;
-          dlCheck.sha256 = got;
+        if (zipMode) {
+          dlCheck = { kind: 'zip', members: await verifyZipMembers(dlPath, zipFixtures) };
+        } else {
+          const sz = (await fsp.stat(dlPath)).size;
+          dlCheck = { size: sz, complete: sz === fixture.size };
+          if (sz === fixture.size) {
+            const got = await sha256File(dlPath);
+            dlCheck.hashMatch = got === fixture.sha256;
+            dlCheck.sha256 = got;
+          }
         }
       }
     } catch { /* download never completed */ }
@@ -490,6 +584,9 @@ function printVerdict() {
     console.log(`receiver fatal page: ${JSON.stringify(lastSampleR.r.ui.fatal)}`);
   }
   console.log(`download outcome:    failure=${JSON.stringify(R.downloadFailure)} check=${JSON.stringify(R.downloadCheck)}`);
+  if (R.downloadCheck && R.downloadCheck.members) {
+    console.log(`zip members:         ${R.downloadCheck.members.map((m) => `${m.name}=${m.result}`).join('  ')}`);
+  }
   console.log('================================================\n');
 }
 

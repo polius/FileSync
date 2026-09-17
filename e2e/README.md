@@ -55,3 +55,18 @@ node run.mjs --engines=chromium,webkit --sinks=sw --ice=auto --size=1G \
 - **Cross-network NAT traversal.** All tests here run sender + receiver on the
   same machine. To prove TURN-relay actually works across symmetric NATs you
   need two real networks.
+
+## Interruption harness (`interruption/`)
+
+Drives a sender + receiver (two Chromium browsers) and injects mid-transfer
+network interruptions; see the header of `interruption/run.mjs` for the scenario
+list. Highlights:
+
+```bash
+# 20s receiver blackout -> transparent resume, byte-exact file
+cd interruption && node run.mjs --scenario=t2 --freeze-ms=20000 --sink=sw --ice=auto --observe=90000
+
+# "Download all" bundle: 20s blackout during file 2 of 2 -> transparent resume;
+# the delivered files.zip is unpacked and every member hash is verified
+node run.mjs --scenario=zip --sink=sw --ice=auto --observe=90000
+```

@@ -525,7 +525,7 @@ export class User {
     if (!target || !target.conn) {
       // The owner/host vanished between the click and the send — roll back cleanly
       // instead of throwing on a missing connection.
-      console.warn('downloadFile: routing peer is gone for file', file.id);
+      console.warn('Download request: routing peer is gone for file', file.id);
       this._abortDownloadStart(file, file.id, 'The sender is no longer connected. Please try again.');
       return false;
     }
@@ -581,7 +581,10 @@ export class User {
   }
 
   _resumeStillWanted(file) {
-    return !file.aborted && !file.removed && !file.zip && file.canResume;
+    if (file.aborted || file.removed) return false;
+    // Bundle files resume inside the bundle; offset 0 is fine (the file never started).
+    if (file.zip) return !!this._downloadAll?.active && !!file._zipController;
+    return file.canResume;
   }
 
   _setRowState(fileId, { loading = false, failed = false, success = false, abort = false, download = false }) {
@@ -608,9 +611,10 @@ export class User {
     if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
   }
 
-  // A download paused mid-transfer (connection interrupted, sink kept open). Try to
-  // re-establish it transparently with backoff; when the attempts run out, leave the
-  // row in a resumable state so the user can retry manually.
+  // A download paused mid-transfer (connection interrupted, output kept open — a
+  // single sink or, for bundles, the zip stream). Try to re-establish it transparently
+  // with backoff; when the attempts run out, leave the row in a resumable state so the
+  // user can retry manually.
   async _handleFileInterrupted(file) {
     file._resuming = true;
     const pct = this._resumePercent(file);
@@ -646,7 +650,31 @@ export class User {
       if (resumed) { file._resuming = false; return; }
     }
     file._resuming = false;
-    if (this._resumeStillWanted(file)) this._showResumeAvailable(file);
+    if (!this._resumeStillWanted(file)) return;
+    if (file.zip) {
+      // Bundles have no per-file manual retry — end the bundle; the modal shows it.
+      this._downloadAll.active = false;
+      return;
+    }
+    this._showResumeAvailable(file);
+  }
+
+  // Wait until every byte already enqueued for the paused file has reached the bundle
+  // sink: client-zip is starved (its input queue is empty) and no sink write is in
+  // flight. Only then does the enqueued count (file._flushed) become a safe resume
+  // point — client-zip's running CRC and the sink content agree exactly. The read loop
+  // is only ever observable in read-pending or write-pending (the chunk handoff between
+  // them is synchronous), so with writing=false and an empty input queue the pending
+  // read means nothing is left anywhere in the pipeline. Post-pause nothing new arrives,
+  // so the state settles within a few ticks.
+  async _quiesceBundle(file) {
+    const st = this._downloadAll;
+    if (!st || st.file !== file) return;
+    for (let i = 0; i < 500; i++) {
+      await new Promise((r) => setTimeout(r, 10));
+      if (!st.writing && st.controller && st.controller.desiredSize > 0) return;
+    }
+    throw new Error('bundle drain timed out');
   }
 
   // Terminal-but-resumable row state: bytes are kept, the download button retries.
@@ -810,6 +838,9 @@ export class User {
       current: 0,
       sizes: files.map(x => x.size),
       interval: setInterval(() => this._downloadAllProgress(), 500),
+      // Zip-pipeline liveness, used by _quiesceBundle to find a safe resume point.
+      controller: null,
+      writing: false,
     };
 
     // Wire browser-side cancel AFTER _downloadAll state is initialized — the hook
@@ -840,9 +871,24 @@ export class User {
           },
         });
         file.setZipController(controller);
+        self._downloadAll.controller = controller;
         file.zip = true;
         file.in_progress = true;
-        file._aborted = false;  // fresh start; stream cancel() re-sets this
+        // Fresh bundle entry: drop resume state a prior single download may have left.
+        file._aborted = false;
+        file._resumeOffset = 0;
+        file._flushed = 0;
+        // Mid-transfer interruptions pause the file (stream stays open) and land here.
+        file._onInterrupted = async () => {
+          try {
+            await self._quiesceBundle(file);
+          } catch (err) {
+            console.warn('Bundle drain failed:', err);
+            self._downloadAll.active = false;
+            return;
+          }
+          await self._handleFileInterrupted(file);
+        };
 
         try {
           await file.init();
@@ -852,25 +898,16 @@ export class User {
           break;
         }
 
-        // Kick the sender off.
-        const target = self._remotePeers[self._isHost ? file.owner_id : self._room_id];
-        if (!target || !target.conn) {
-          console.error('downloadAll: routing peer is gone for file', file.id);
+        // Kick the sender off. resume_offset > 0 continues an interrupted file.
+        if (!self._sendDownloadRequest(file)) {
           self._downloadAll.active = false;
           break;
         }
-        target.conn.send({
-          'webrtc-file-download': {
-            file_id: file.id,
-            requester_id: self._peer.id,
-            requester_name: self._name,
-            peer_id: file.peer.id,
-          },
-        });
 
         yield { name: file.name, input: stream, lastModified: new Date() };
         // When yield returns, client-zip has fully consumed this file's stream
         // (controller was closed by file._onEnd). Move on to the next.
+        self._downloadAll.controller = null;
       }
     }
 
@@ -886,7 +923,9 @@ export class User {
         }
         const { value, done } = await reader.read();
         if (done) break;
+        this._downloadAll.writing = true;
         await zipSink.write(value);
+        this._downloadAll.writing = false;
       }
       if (this._downloadAll.active) {
         await zipSink.close();
@@ -912,6 +951,12 @@ export class User {
         inflight._conn = null;
         inflight._peer = null;
         inflight._in_progress = false;
+        // A mid-transfer file still holds an open zip stream controller — kill it so no
+        // zombie resume can target a dead bundle.
+        if (inflight._zip && inflight._zipController) {
+          try { inflight._zipController.error(new Error('bundle-ended')); } catch {}
+          inflight._zipController = null;
+        }
       }
       for (const f of Object.values(this._files)) {
         f.zip = false;
