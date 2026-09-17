@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "lint": "eslint .",
-    "test": "node --test \"tests/js/*.test.mjs\""
+    "test": "node --test --test-force-exit \"tests/js/*.test.mjs\""
   },
   "devDependencies": {
     "eslint": "^9.39.1",
