@@ -51,8 +51,8 @@ jobs:
       - run: npm test
 
   # End-to-end smoke: real Chromium pair exchanging a 100 MB file through the actual
-  # container (nginx + FastAPI signaling), verified by SHA-256. Uses the same compose
-  # topology users deploy with, only swapping in a CI secret and a locally built image.
+  # container (nginx + FastAPI signaling), verified by SHA-256. Uses the exact compose
+  # topology users deploy with, only swapping in a locally built image.
   e2e-smoke:
     runs-on: ubuntu-latest
     steps:
@@ -62,8 +62,7 @@ jobs:
           # Tag :latest so `docker compose up` below uses this build instead of
           # pulling the released image from Docker Hub. Never pushed.
           docker build -t poliuscorp/filesync:latest .
-          sed "s/<SECRET_KEY>/ci-e2e-not-a-real-secret/g" deploy/docker-compose.yml > docker-compose.ci.yml
-          docker compose -f docker-compose.ci.yml up -d --wait
+          docker compose -f deploy/docker-compose.yml up -d --wait
       - uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -75,4 +74,4 @@ jobs:
           node run.mjs --smoke --base-url=http://localhost --size=20M
       - name: Teardown
         if: always()
-        run: docker compose -f docker-compose.ci.yml down -v
+        run: docker compose -f deploy/docker-compose.yml down -v

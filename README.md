@@ -28,43 +28,27 @@
 
 ### Prerequisites
 
-- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
+- [Docker](https://docs.docker.com/get-docker/)
+- [Docker Compose](https://docs.docker.com/compose/install/)
 
-FileSync requires a secret key. Generate one:
+### Option A — HTTP (quick local test)
 
-```bash
-openssl rand -base64 32
-```
-
-You'll paste it in place of both `<SECRET_KEY>` placeholders in the compose file, in either setup below.
-
-### Option A — HTTP (local network / quick start)
-
-Suitable for a trusted LAN. Large transfers (over ~500 MB) are unreliable over plain HTTP; use [Option B](#option-b--https-own-domain-recommended) for those.
+For quickly testing the app locally — not meant for production. Use [Option B](#option-b--https-own-domain-recommended) instead.
 
 1. Download [`deploy/docker-compose.yml`](deploy/docker-compose.yml).
-2. Replace both `<SECRET_KEY>` placeholders with your generated key:
-
-```yaml
-- --static-auth-secret=<SECRET_KEY>
-- SECRET_KEY=<SECRET_KEY>
-```
-
-3. Start it:
+2. Start it:
 
 ```bash
 docker compose up -d
 ```
 
-Open `http://localhost` (or your server's IP).
+Open `http://localhost` on the machine running Docker.
 
 ### Option B — HTTPS (own domain, recommended)
 
 1. Download [`deploy/docker-compose-ssl.yml`](deploy/docker-compose-ssl.yml) and [`deploy/Caddyfile`](deploy/Caddyfile).
-2. Replace both `<SECRET_KEY>` placeholders with your generated key (same as Option A).
-3. Open `Caddyfile` and replace `yourdomain.com` (the first line) with your domain. Leave the rest of the file as it is.
-
-4. Start it:
+2. Open `Caddyfile` and replace `yourdomain.com` (the first line) with your domain. Leave the rest of the file as it is.
+3. Start it:
 
 ```bash
 docker compose -f docker-compose-ssl.yml up -d
@@ -84,7 +68,7 @@ Open these on your server's firewall:
 
 The 50000–50100 UDP range carries relayed traffic for the minority of connections that can't go direct, typically a peer behind symmetric NAT or a firewall that blocks UDP.
 
-## Customizing ports
+## Customizing ports (optional)
 
 **HTTP port.** In `docker-compose.yml`, change the **first** number of the `filesync` port mapping. The second is the container's internal port; leave it as `80`:
 
@@ -95,21 +79,17 @@ ports:
 
 **HTTPS port.** Keep Caddy on `443`. For a non-standard external port, put your own reverse proxy in front, terminate TLS there, and forward to FileSync's internal HTTP port.
 
-## How received files are saved
+## How it works
 
-FileSync uses the first save method the browser supports, in this order:
+FileSync uses native [WebRTC](https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API) to transfer files directly between browsers, with no intermediate server in the data path. A WebSocket signaling server (served at `/ws` by the FileSync app itself) assists with connection setup only — relaying SDP offers/answers and ICE candidates between peers; once the peer-to-peer connection is established, file bytes flow directly between browsers and the server is no longer involved.
+
+On the receiving side, the first save method the browser supports is used, in this order:
 
 1. **File System Access API** — streams to a file you pick. Desktop Chromium browsers (Chrome, Edge, Brave, Opera) over HTTPS.
 2. **Service Worker** — streams into a normal browser download. All modern browsers over HTTPS.
 3. **Blob** — buffers the entire file in memory before saving. Last resort; the only option over plain HTTP.
 
 The first two require a secure context (HTTPS or localhost), so serving FileSync over HTTPS is recommended: it enables memory-safe transfers of any size.
-
-## Under the hood
-
-FileSync uses native [WebRTC](https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API) to transfer files directly between browsers, with no intermediate server in the data path.
-
-A WebSocket signaling server (served at `/ws` by the FileSync app itself) assists with connection setup only, relaying SDP offers/answers and ICE candidates between peers. Once the peer-to-peer connection is established, file bytes flow directly between browsers and the server is no longer involved.
 
 ![File Transfer - https://xkcd.com/949](web/assets/comic.png)
 

@@ -11,13 +11,27 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.signaling import router as signaling_router
 
-# Get environment variables. SECRET_KEY signs both the TURN HMAC credentials and the JWT,
-# so refuse to start without it rather than failing later at request time.
-SECRET_KEY = os.getenv("SECRET_KEY")
-if not SECRET_KEY or SECRET_KEY == "<SECRET_KEY>":
-    # Also reject the compose files' literal placeholder — it is a publicly known
-    # value, so running with it would silently let anyone mint TURN credentials.
-    raise RuntimeError("SECRET_KEY environment variable is required (replace the <SECRET_KEY> placeholder with a real secret).")
+# SECRET_KEY signs both the TURN HMAC credentials and the JWT. The env var wins
+# (docker run, CI, dev); the compose files instead set SECRET_FILE, pointing at the
+# key the init service generates into the shared volume. Refuse to start without
+# either rather than failing later at request time.
+def load_secret() -> str:
+    key = os.getenv("SECRET_KEY")
+    if key:
+        if key == "<SECRET_KEY>":
+            # Publicly known value: running with it would let anyone mint TURN credentials.
+            raise RuntimeError("SECRET_KEY is the <SECRET_KEY> placeholder — this compose file is outdated. Download the current deploy/docker-compose.yml (which generates the key automatically), or set a real SECRET_KEY.")
+        return key
+    path = os.getenv("SECRET_FILE")
+    if not path:
+        raise RuntimeError("No signing secret: set SECRET_KEY, or start via docker compose (which provisions SECRET_FILE).")
+    with open(path) as f:
+        key = f.read().strip()
+    if not key:
+        raise RuntimeError(f"Secret file {path} is empty — delete the keys volume and restart the stack.")
+    return key
+
+SECRET_KEY = load_secret()
 
 # Init FastAPI
 app = FastAPI(title='FileSync API', version='4.1.0', root_path="/api")

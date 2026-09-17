@@ -15,29 +15,49 @@ services:
     image: poliuscorp/filesync
     container_name: filesync-app
     environment:
-      - SECRET_KEY=<SECRET_KEY>
+      - SECRET_FILE=/keys/secret
+    volumes:
+      - keys:/keys:ro
     depends_on:
-      - coturn
+      coturn:
+        condition: service_started
+      init:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   coturn:
     image: coturn/coturn:alpine
     container_name: filesync-coturn
+    entrypoint: ["/bin/sh", "-c"]
     command:
-      - --fingerprint
-      - --use-auth-secret
-      - --no-multicast-peers
-      - --no-cli
-      - --realm=filesync.app
-      - --static-auth-secret=<SECRET_KEY>
-      - --listening-port=3478
-      - --min-port=50000
-      - --max-port=50100
+      - |
+        secret=$$(cat /keys/secret) && exec turnserver \
+          --fingerprint \
+          --use-auth-secret \
+          --no-multicast-peers \
+          --no-cli \
+          --realm=filesync.app \
+          --static-auth-secret="$$secret" \
+          --listening-port=3478 \
+          --min-port=50000 \
+          --max-port=50100
+    volumes:
+      - keys:/keys:ro
+    depends_on:
+      init:
+        condition: service_completed_successfully
     ports:
       - "3478:3478/tcp"
       - "3478:3478/udp"
       - "50000-50100:50000-50100/udp"
     restart: unless-stopped
 
+  init:
+    image: poliuscorp/filesync
+    command: python3 api/init_secret.py
+    volumes:
+      - keys:/keys
+
 volumes:
   filesync:
+  keys:
