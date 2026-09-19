@@ -56,6 +56,54 @@ node run.mjs --engines=chromium,webkit --sinks=sw --ice=auto --size=1G \
   same machine. To prove TURN-relay actually works across symmetric NATs you
   need two real networks.
 
+## TURN relay cells on localhost
+
+The deployed coturn refuses to relay into private ranges (`--denied-peer-ip` in
+`deploy/docker-compose.yml`: RFC1918, CGNAT `100.64/10`, IPv6 ULA + link-local)
+so the TURN server can't be used as a pivot into the host's network. Loopback
+and link-local are refused by coturn by default; the explicit lines for those
+are belt-and-suspenders. Peers over the internet always present public
+candidates, so real transfers are unaffected — but relay-forced tests against a
+**localhost stack cannot connect**: two browsers on the Docker host only ever
+offer private/loopback candidates, and every relayed path to them is refused by
+design (observed as a fast 403 on the permission/channel bind, not a hang).
+
+One edge case: a peer on the **server's own LAN**. The relayed path to its
+private host candidate is now refused, and ICE falls back to the peer's public
+srflx/relay candidates — which on a hairpin-challenged home router may not
+connect. Deployments serving the outside world are unaffected.
+
+- **Relay smoke against a real deployment** — the deny list is active, so this is
+  also the check that the hardening didn't break legitimate relaying:
+
+  ```bash
+  node run.mjs --sinks=sw --ice=turn --size=20M --base-url=https://<your-domain>
+  ```
+
+- **Relay-forced local runs** (opt-in matrix `turn` cells via `--ice`, and the
+  interruption `t3`/`t4`/`zip` scenarios) need coturn without the deny flags.
+  Temporarily comment out the `--denied-peer-ip=` lines in **both**
+  `deploy/docker-compose.yml` and `deploy/docker-compose-ssl.yml`, restart the
+  stack, run the tests, then uncomment and restart again. Don't use
+  `git checkout --` to "restore" — before this change is committed that would
+  wipe the hardening instead of restoring it.
+
+  The default `run.mjs` matrix is `auto,stun` for exactly this reason: its
+  `turn` cells fail by design against the hardened stack. Opt in explicitly:
+
+  ```bash
+  node run.mjs --ice=auto,stun,turn
+  ```
+
+- **Negative check (optional)** — with the *default* stack, relaying to one of the
+  server's private addresses must be refused. Run `turnutils_peer` on the
+  server, then from a machine on the same network relay to it with
+  `turnutils_uclient` (ephemeral creds from `/api/credentials`; the JWT payload
+  is plain base64). Expected: `channel bind: error 403` within milliseconds.
+  coturn also logs `A peer IP <ip> denied in the range: <range>` at ERROR level,
+  but not for every refusal — treat the client-side 403 as the reliable signal.
+  With the deny flags commented out, the same probe connects.
+
 ## Interruption harness (`interruption/`)
 
 Drives a sender + receiver (two Chromium browsers) and injects mid-transfer

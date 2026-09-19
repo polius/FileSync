@@ -28,7 +28,10 @@ const SMOKE = argv.smoke === true;
 const BASE_URL    = (argv['base-url'] || 'http://localhost').replace(/\/$/, '');
 const ENGINES     = parseList(argv.engines, SMOKE ? ['chromium'] : ['chromium', 'firefox', 'webkit']);
 const SINKS       = parseList(argv.sinks,   SMOKE ? ['sw']       : ['sw', 'fs', 'blob']);
-const ICE_MODES   = parseList(argv.ice,     SMOKE ? ['auto']     : ['auto', 'stun', 'turn']);
+// 'turn' is opt-in: the deployed coturn denies relaying into private ranges
+// (deploy/docker-compose.yml), so turn cells against a localhost stack fail by
+// design. Pass --ice=auto,stun,turn after commenting out the deny flags.
+const ICE_MODES   = parseList(argv.ice,     SMOKE ? ['auto']     : ['auto', 'stun']);
 const SIZE_BYTES  = parseSize(argv.size,    '100M');
 const KEEP        = argv.keep === true;
 
