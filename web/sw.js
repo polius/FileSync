@@ -9,6 +9,12 @@
 //   ArrayBuffer | Uint8Array  -> enqueued as a chunk
 //   { type: 'end' }           -> stream is closed cleanly
 //   { type: 'abort' }         -> stream is errored (browser will show an incomplete download)
+//
+// The transfer entry deliberately stays in the map after 'end': in Firefox the
+// navigation's fetch event can arrive AFTER the page finished streaming (fast
+// drain of small staged files), so deleting on 'end' would 404 a download whose
+// bytes are already fully buffered in the closed stream. The fetch handler
+// guards re-serving with `served`; the GC reclaims old entries.
 
 const transfers = new Map();
 const KEEPALIVE_MS = 15_000;
@@ -45,7 +51,6 @@ self.addEventListener('message', (event) => {
     }
     if (data && data.type === 'end') {
       try { controller.close(); } catch {}
-      transfers.delete(id);
       return;
     }
     if (data && data.type === 'abort') {
@@ -67,10 +72,11 @@ self.addEventListener('fetch', (event) => {
 
   const id = match[1];
   const entry = transfers.get(id);
-  if (!entry) {
+  if (!entry || entry.served) {
     event.respondWith(new Response('Transfer not found or expired.', { status: 404 }));
     return;
   }
+  entry.served = true;
 
   const headers = new Headers({
     'Content-Type': entry.mime,
@@ -85,7 +91,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(new Response(entry.stream, { headers }));
 });
 
-// Garbage-collect transfers that registered but never had their /__download/{id} fetched.
+// Garbage-collect transfers that were never fetched, or whose download has long finished.
 setInterval(() => {
   const now = Date.now();
   for (const [id, entry] of transfers) {
