@@ -61,6 +61,7 @@ services:
 
   init:
     image: poliuscorp/filesync
+    container_name: filesync-init
     command: python3 api/init_secret.py
     volumes:
       - keys:/keys
