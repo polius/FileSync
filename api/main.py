@@ -34,7 +34,7 @@ def load_secret() -> str:
 SECRET_KEY = load_secret()
 
 # Init FastAPI
-app = FastAPI(title='FileSync API', version='4.2.0', root_path="/api")
+app = FastAPI(title='FileSync API', version='4.3.0', root_path="/api")
 
 # CORS is only needed when the frontend is served from a different origin than the API
 # (i.e. local development). In production everything is same-origin behind the reverse
