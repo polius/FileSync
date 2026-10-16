@@ -152,6 +152,8 @@ export async function registerServiceWorker() {
       if (sinkState.availability.sw.available) {
         sinkState.availability.sw.reason = 'Available (Service Worker active).';
       }
+      // Best-effort cleanup of staging files left by an abandoned paused download.
+      sweepStaleStaging();
     } else {
       // Registration succeeded but the worker never reached 'activated'. Don't lie about
       // sw availability — the next openSink call would throw otherwise.
@@ -200,6 +202,37 @@ function extensionFromName(name) {
 // created only at close(), streaming the staged file into the Service Worker response.
 // A failed/interrupted transfer therefore never leaves a partial download behind, and
 // the staged file doubles as the resume buffer across reconnections.
+//
+// Resource note: because the staged file is re-emitted as the browser download, the SW
+// path needs roughly 2x the file size in free space (OPFS staging + final download) and
+// is subject to the origin's OPFS quota. The FS sink writes straight to the destination
+// (1x, no quota) and is preferred by auto-selection on Chromium for that reason.
+//
+// Flow control: delivery to the worker is credit-gated (see sw.js). The page keeps a
+// bounded number of chunks in flight and waits for a credit before sending the next, so
+// a slow disk consumer cannot make the worker buffer the whole file in memory.
+
+// Abandoned staging files (transfer interrupted, then the tab closed) are swept on boot.
+const _STAGING_PREFIX = 'filesync-part-';
+const _STAGING_MAX_AGE_MS = 60 * 60 * 1000;
+
+export async function sweepStaleStaging() {
+  if (!navigator.storage || typeof navigator.storage.getDirectory !== 'function') return;
+  try {
+    const root = await navigator.storage.getDirectory();
+    const now = Date.now();
+    const candidates = [];
+    for await (const [name, handle] of root.entries()) {
+      if (typeof name === 'string' && name.startsWith(_STAGING_PREFIX)) candidates.push([name, handle]);
+    }
+    for (const [name, handle] of candidates) {
+      try {
+        const file = await handle.getFile();
+        if (now - file.lastModified > _STAGING_MAX_AGE_MS) await root.removeEntry(name);
+      } catch {}
+    }
+  } catch {}
+}
 
 async function openSwSink({ id, name, size, mime }) {
   if (!navigator.storage || typeof navigator.storage.getDirectory !== 'function') {
@@ -225,14 +258,26 @@ async function openSwSink({ id, name, size, mime }) {
 
     const channel = new MessageChannel();
     let sinkRef = null;
+    // Credit-gated flow control (protocol in sw.js): the worker hands out a bounded
+    // window of credits and tops it up as the download consumer drains. The page waits
+    // for a credit before posting the next chunk; 'cancel' unblocks a waiting sender.
+    let credits = 0;
+    let cancelled = false;
+    let wake = null;
+    const notify = () => { const w = wake; wake = null; if (w) w(); };
     const ready = new Promise((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('Service Worker did not respond.')), 5000);
       channel.port1.onmessage = (ev) => {
         if (ev.data?.type === 'ready') {
           clearTimeout(timeout);
           resolve();
+        } else if (ev.data?.type === 'credit') {
+          credits += ev.data.n || 0;
+          notify();
         } else if (ev.data?.type === 'cancel') {
           // User cancelled the browser download — call this sink's onCancel hook (if any).
+          cancelled = true;
+          notify();
           if (sinkRef && typeof sinkRef._onCancel === 'function') sinkRef._onCancel();
         }
       };
@@ -251,18 +296,33 @@ async function openSwSink({ id, name, size, mime }) {
     document.body.appendChild(iframe);
 
     const port = channel.port1;
+    const waitForCredit = () => new Promise((resolve) => {
+      if (credits > 0) { credits -= 1; return resolve(true); }
+      if (cancelled) return resolve(false);
+      wake = () => resolve(!cancelled);
+    });
+
     const stagedFile = await handle.getFile();
     const reader = stagedFile.stream().getReader();
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      const buf = value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength);
-      port.postMessage(buf, [buf]);
+    try {
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (!await waitForCredit()) { try { await reader.cancel(); } catch {} break; }
+        const buf = value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength);
+        port.postMessage(buf, [buf]);
+      }
+      port.postMessage({ type: 'end' });
+    } catch (err) {
+      // Tear the worker side down so it does not hold a half-open download response
+      // (and its credit timer) open until the Service Worker is evicted.
+      try { port.postMessage({ type: 'abort', reason: err && err.message }); } catch {}
+      throw err;
+    } finally {
+      port.close();
+      setTimeout(() => iframe.remove(), 1000);
+      cleanupStaging();
     }
-    port.postMessage({ type: 'end' });
-    port.close();
-    setTimeout(() => iframe.remove(), 1000);
-    cleanupStaging();
   };
 
   return {
