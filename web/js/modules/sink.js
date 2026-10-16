@@ -234,7 +234,7 @@ async function openSwSink({ id, name, size, mime }) {
     throw new Error('OPFS is not available in this browser.');
   }
   const root = await navigator.storage.getDirectory();
-  const stagingName = `filesync-part-${id}`;
+  const stagingName = `${_STAGING_PREFIX}${id}`;
   // Leftover staging from an earlier session with this id is dead weight — drop it.
   try { await root.removeEntry(stagingName); } catch {}
   const handle = await root.getFileHandle(stagingName, { create: true });
