@@ -203,14 +203,9 @@ function extensionFromName(name) {
 // A failed/interrupted transfer therefore never leaves a partial download behind, and
 // the staged file doubles as the resume buffer across reconnections.
 //
-// Resource note: because the staged file is re-emitted as the browser download, the SW
-// path needs roughly 2x the file size in free space (OPFS staging + final download) and
-// is subject to the origin's OPFS quota. The FS sink writes straight to the destination
-// (1x, no quota) and is preferred by auto-selection on Chromium for that reason.
-//
-// Flow control: delivery to the worker is credit-gated (see sw.js). The page keeps a
-// bounded number of chunks in flight and waits for a credit before sending the next, so
-// a slow disk consumer cannot make the worker buffer the whole file in memory.
+// Note: the staged file is re-emitted as the download, so this needs ~2x the size in free
+// space and is subject to the OPFS quota (hence FS is preferred where available). Delivery
+// to the worker is credit-gated (see sw.js) so a slow consumer cannot balloon memory.
 
 // Abandoned staging files (transfer interrupted, then the tab closed) are swept on boot.
 const _STAGING_PREFIX = 'filesync-part-';
@@ -258,9 +253,7 @@ async function openSwSink({ id, name, size, mime }) {
 
     const channel = new MessageChannel();
     let sinkRef = null;
-    // Credit-gated flow control (protocol in sw.js): the worker hands out a bounded
-    // window of credits and tops it up as the download consumer drains. The page waits
-    // for a credit before posting the next chunk; 'cancel' unblocks a waiting sender.
+    // Credit-gated flow control (protocol in sw.js); 'cancel' unblocks a waiting sender.
     let credits = 0;
     let cancelled = false;
     let wake = null;

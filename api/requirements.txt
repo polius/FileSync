@@ -1,8 +1,5 @@
-# Pinned for reproducible production builds (Dependabot proposes updates).
-# Deliberately NOT fastapi[standard]: this service is a small signaling relay and does
-# not use the FastAPI CLI, cloud client, telemetry/Sentry, or rich/typer stack that the
-# [standard] extra pulls in. uvicorn[standard] supplies the ASGI server plus the
-# websockets/uvloop/httptools it needs on Linux.
+# Pinned for reproducible builds (Dependabot proposes updates). Deliberately not
+# fastapi[standard]: a small signaling relay does not need the CLI/cloud/rich stack it pulls in.
 fastapi==0.143.3
 uvicorn[standard]==0.54.0
 PyJWT==2.15.1

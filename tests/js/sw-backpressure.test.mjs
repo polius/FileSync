@@ -1,15 +1,5 @@
-// Service-Worker streaming backpressure tests (C3).
-//
-// Loads the REAL web/sw.js with a stubbed ServiceWorkerGlobalScope and drives the
-// credit protocol with a real MessageChannel + ReadableStream:
-//
-//   * the worker grants a bounded initial window and then STOPS granting until the
-//     download consumer drains — so the queue can never grow with the file size;
-//   * draining the response stream releases exactly the room that was freed;
-//   * a page that ignores its window gains no credit (and still loses no bytes);
-//   * 'end' closes the stream cleanly with byte-exact content;
-//   * 'abort' errors the stream;
-//   * a consumer cancel is reported back to the page.
+// Service-Worker streaming backpressure tests (C3): drive the REAL web/sw.js credit
+// protocol with a stubbed ServiceWorkerGlobalScope, a MessageChannel and a ReadableStream.
 //
 // Run: node --test --test-force-exit "tests/js/*.test.mjs"
 

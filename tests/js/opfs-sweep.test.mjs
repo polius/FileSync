@@ -1,10 +1,5 @@
-// OPFS staging-sweep tests (C4).
-//
-// A paused download that is then abandoned (tab closed) leaves its OPFS staging file
-// behind. openSwSink() only cleans the id it is about to reuse, so those files would
-// accumulate in — and eventually exhaust — the very OPFS quota the SW sink depends on.
-// sweepStaleStaging() reclaims them on boot, and MUST NOT touch a fresh (possibly
-// in-progress) staging file or anything that is not ours.
+// OPFS staging-sweep tests (C4): sweepStaleStaging() reclaims files abandoned by closed
+// tabs on boot, but must never touch a fresh in-progress file or foreign entries.
 //
 // Run: node --test --test-force-exit "tests/js/*.test.mjs"
 

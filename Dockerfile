@@ -57,23 +57,12 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 # Expose ports
 EXPOSE 80
 
-# Start FastAPI + Nginx. bash's `wait -n` returns as soon as EITHER process exits, so the
-# container stops (and `restart: unless-stopped` restarts it) if the backend dies —
-# instead of nginx keeping a half-dead container alive indefinitely. (busybox sh's
-# `wait -n` does not reliably fire for a backgrounded child as PID 1, so we use bash.)
+# Start FastAPI + Nginx. `wait -n` exits as soon as either dies, so a dead backend stops
+# the container instead of being masked by nginx (bash; busybox `wait -n` is unreliable
+# here). The backend runs unprivileged via su-exec; only nginx needs root for :80.
 #
-# The backend runs as the unprivileged `nginx` user via su-exec (which execs, so the
-# backgrounded PID is the backend itself and `wait -n` still works). Only the nginx
-# master needs root, to bind :80 and drop its workers to `nginx`.
-#
-# --ws-max-size caps WebSocket frames at the transport (uvicorn's default is 16 MiB,
-# which would be fully buffered before the app's own 32 KiB payload check runs);
-# 64 KiB leaves headroom over the signaling _MAX_PAYLOAD_BYTES limit.
-#
-# --ws-ping-interval/--ws-ping-timeout pin uvicorn's transport-level keepalive. These
-# match uvicorn's defaults, but they are stated explicitly because the app's liveness
-# now depends on them: browsers answer WebSocket ping control frames in their network
-# stack, i.e. even for a throttled/frozen hidden tab whose JS timers have stopped. That
-# makes this the reliable liveness signal, which is why the signaling layer's own
-# app-message idle timeout can be generous (see api/signaling.py:_IDLE_TIMEOUT_SECONDS).
+# --ws-max-size caps frames at the transport (uvicorn defaults to 16 MiB, buffered before
+# the app's 32 KiB check). --ws-ping-interval/--ws-ping-timeout are the real liveness
+# signal: control frames are answered by the browser's network stack even in a throttled
+# hidden tab, which is why signaling.py's app-message idle timeout can be generous.
 CMD ["bash", "-c", "su-exec nginx python3 -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --ws-max-size 65536 --ws-ping-interval 20 --ws-ping-timeout 20 & nginx -g 'daemon off;' & wait -n"]

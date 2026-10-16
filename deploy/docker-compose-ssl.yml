@@ -1,6 +1,5 @@
-# TLS topology: Caddy terminates HTTPS and proxies to the FileSync stack over the compose
-# network. See docker-compose.yml for the plain-HTTP topology; the service definitions
-# below are kept in sync with it (coturn flags are shared via coturn-entrypoint.sh).
+# TLS topology: Caddy terminates HTTPS and proxies to the stack. Kept in sync with
+# docker-compose.yml; coturn flags are shared via coturn-entrypoint.sh.
 
 x-hardening: &hardening
   security_opt:

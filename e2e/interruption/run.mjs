@@ -587,9 +587,7 @@ function printVerdict() {
   if (R.downloadCheck && R.downloadCheck.members) {
     console.log(`zip members:         ${R.downloadCheck.members.map((m) => `${m.name}=${m.result}`).join('  ')}`);
   }
-  // Invariant: whenever the row tells the user to click download, that control must be
-  // visible — it is the only route back into the resume path. (Regression guard for the
-  // bug covered by tests/js/webrtc-resume-ui.test.mjs.)
+  // Invariant: a "click download" row must show the control (the only resume route).
   const resumableRow = [...R.samples].reverse().find(
     (x) => x.r?.ui?.rowError?.shown && /Click download/i.test(x.r.ui.rowError.text || ''),
   );

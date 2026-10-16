@@ -5,9 +5,8 @@ on:
     types: [published]
 
 jobs:
-  # Gate the publish on the same checks that protect main. A release can be created from
-  # any ref (and from a tag that never ran on main), so run the tests here rather than
-  # trusting that the checks workflow already passed.
+  # A release can be cut from any ref (even one that never ran on main), so gate the
+  # publish on the tests here.
   verify:
     runs-on: ubuntu-latest
     steps:

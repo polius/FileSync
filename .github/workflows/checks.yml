@@ -24,11 +24,8 @@ jobs:
           severity: 'CRITICAL'
           ignore-unfixed: true
 
-  # Installs the backend deps, imports the app modules, runs the backend unit tests with
-  # coverage, and audits the pinned dependency set for known vulnerabilities. The import
-  # check catches dependency bumps that break imports (a plain syntax check would miss
-  # runtime import errors); main.py refuses to import without SECRET_KEY, so pass a
-  # throwaway value.
+  # Backend deps + import check (catches dependency bumps a syntax check would miss) +
+  # tests with coverage + pip-audit. main.py needs a SECRET_KEY to import.
   python:
     runs-on: ubuntu-latest
     steps:

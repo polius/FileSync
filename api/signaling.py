@@ -34,27 +34,14 @@ _MAX_MSG_PER_SECOND = 100                # per-connection rate limit (all messag
 _PAIR_WINDOW_SECONDS = 10.0              # sliding-window length for per-target rate limit
 _PAIR_MAX_PER_WINDOW = 50                # max signal msgs from one source to one target per window
 _REGISTER_TIMEOUT_SECONDS = 10.0         # first message must arrive within this window
-# Close a registered socket after this long with no *application* message. This is a
-# coarse backstop only — it must never be the primary liveness mechanism.
-#
-# The client keepalive is a JS setInterval (peer.js:_startPing), and browsers throttle
-# timers in hidden tabs: Firefox aggressively, Chromium down to one wake-up per minute
-# ("intensive throttling") once the tab has been hidden for ~5 minutes. A host that
-# walks to another device/window is therefore routinely silent for far longer than any
-# short interval. When this timer was 30 s that reaped live hosts, so the guest got
-# "Could not reach the host" even though the host's browser was still connected.
-#
-# Real liveness is enforced at the transport layer by uvicorn's WebSocket ping/pong
-# (see the Dockerfile CMD): control frames are answered by the browser's network stack
-# and are immune to JS timer throttling, so a genuinely dead peer is still dropped in
-# ~ping_interval + ping_timeout seconds. This timer only needs to bound sockets that
-# stay transport-alive yet never speak, hence the deliberately generous value.
+# Coarse backstop for sockets that stay transport-alive yet never speak. Real liveness is
+# uvicorn's WebSocket ping/pong (see the Dockerfile CMD), which survives hidden-tab timer
+# throttling; the client ping is a JS interval, so this must tolerate a throttled tab.
 _IDLE_TIMEOUT_SECONDS = 300.0            # 5 min: tolerate 1-wake/min hidden-tab throttling
 _MAX_CONNECTIONS = int(os.getenv("FILESYNC_MAX_WS", "10000"))
 
-# Client-host resolution cache (hostname -> IPv4) used for ICE relay rewriting. Bounded
-# in both size and age: the Host header is attacker-controlled, so this must never grow
-# without limit, and a stale DNS answer must not be cached for the process lifetime.
+# Host-header resolution cache for ICE relay rewriting. Size- and age-bounded because the
+# key is attacker-controlled.
 _HOST_CACHE_MAX = 1024
 _HOST_CACHE_TTL_SECONDS = 600.0
 
@@ -72,10 +59,8 @@ class _PeerRegistry:
 
     def __init__(self) -> None:
         self._peers: Dict[str, WebSocket] = {}
-        # Counts every accepted WebSocket, registered or not. The capacity check must
-        # use this, not len(_peers): a socket sits in the register window for up to
-        # _REGISTER_TIMEOUT_SECONDS before it has a peer id, so counting only registered
-        # peers leaves that window unbounded.
+        # Every accepted socket, registered or not: a socket has no peer id until it
+        # registers, so len(_peers) would leave the register window uncounted.
         self._connections = 0
         self._lock = asyncio.Lock()
 
@@ -241,9 +226,7 @@ def _client_host_hint(ws: WebSocket) -> Optional[str]:
     return host or None
 
 
-# Resolution cache for client host headers: hostname -> (monotonic timestamp, IPv4).
-# Single-worker event loop, few relay candidates per connection: a plain dict is enough,
-# but it is both age- and size-bounded because the key is attacker-controlled.
+# Hostname -> (monotonic timestamp, IPv4); age- and size-bounded (attacker-controlled key).
 _host_resolutions: Dict[str, tuple] = {}
 
 
@@ -356,9 +339,8 @@ router = APIRouter()
 
 @router.websocket("/ws")
 async def signaling(websocket: WebSocket):
-    # Reserve a connection slot before accept — refuse early under overload. This counts
-    # the socket from the moment it is accepted, so sockets still sitting in the register
-    # window are included (see _PeerRegistry.acquire).
+    # Reserve a slot before accept to refuse early under overload (counts unregistered
+    # sockets too; see _PeerRegistry.acquire).
     if not await _REGISTRY.acquire():
         await websocket.close(code=_CLOSE_OVERLOADED, reason="Server at capacity.")
         return

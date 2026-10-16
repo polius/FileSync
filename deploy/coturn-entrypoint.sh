@@ -1,10 +1,6 @@
 #!/bin/sh
-# Launcher for the coturn TURN server, shared by docker-compose.yml and
-# docker-compose-ssl.yml so the security-relevant flags cannot drift between the two
-# deployment topologies. Add or change flags here, once.
-#
-# The static auth secret is read from the shared keys volume provisioned by the `init`
-# service. coturn runs as the image's default unprivileged user (nobody).
+# coturn launcher shared by both compose topologies so the security flags cannot drift.
+# Secret comes from the shared keys volume; coturn runs as the image's unprivileged user.
 set -eu
 
 secret="$(cat /keys/secret)"

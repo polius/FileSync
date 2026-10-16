@@ -1,12 +1,6 @@
-// Resume-UI regression tests (C1).
-//
-// An interrupted download that exhausts the automatic retry budget lands in the
-// "resumable" row state. That state MUST leave the Download control visible: the error
-// line tells the user to click it, and it is the only route back into
-// User.downloadFile()'s resume branch. It previously hid the button (the row showed a
-// red X and a message pointing at a control that was no longer there).
-//
-// Drives the REAL User class (web/js/modules/webrtc/user.js) against a minimal DOM stub.
+// Resume-UI regression tests (C1): the "resumable" row state must keep the Download
+// control visible, since it is the only route back into User.downloadFile()'s resume
+// branch. Drives the REAL User class against a minimal DOM stub.
 //
 // Run: node --test --test-force-exit "tests/js/*.test.mjs"
 

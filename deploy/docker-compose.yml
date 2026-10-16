@@ -1,6 +1,5 @@
-# Shared hardening for every service in this stack: block privilege escalation, and
-# bound container logs so a runaway log line cannot fill the host disk (the default
-# json-file driver is unbounded).
+# Shared hardening: no privilege escalation, bounded container logs (json-file is
+# unbounded by default).
 x-hardening: &hardening
   security_opt:
     - no-new-privileges:true
@@ -12,9 +11,7 @@ x-hardening: &hardening
 
 services:
   filesync:
-    # The project's own image, built and attested by .github/workflows/release.yml
-    # (which tags it :latest). For a frozen production artifact, pin a released version
-    # or digest here, e.g. `image: poliuscorp/filesync:4.3.0`.
+    # Built and published by release.yml. Pin a version/digest for production.
     image: poliuscorp/filesync
     container_name: filesync-app
     environment:

@@ -10,11 +10,9 @@
 //   { type: 'end' }           -> stream is closed cleanly
 //   { type: 'abort' }         -> stream is errored (browser will show an incomplete download)
 //
-// Flow control (worker -> page): the worker owns a bounded window of "credits" and hands
-// them to the page; the page sends one chunk per credit and waits when the window is
-// empty. Credits are topped up as the download consumer drains the response stream
-// (controller.desiredSize), so the queue never grows with the file size — a slow disk
-// cannot make the worker buffer the whole file in memory.
+// Flow control (worker -> page): the worker hands out a bounded window of credits and tops
+// it up as the consumer drains (controller.desiredSize), so the queue never grows with the
+// file size.
 //
 // The transfer entry deliberately stays in the map after 'end': in Firefox the
 // navigation's fetch event can arrive AFTER the page finished streaming (fast
