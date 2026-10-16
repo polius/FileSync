@@ -254,3 +254,29 @@ class TestConnectionCapacity:
     def test_registry_stats_shape(self):
         stats = signaling.registry_stats()
         assert set(stats) == {"registered_peers", "connections", "max_connections"}
+
+
+class TestIdleTimeoutTolerance:
+    """The app-message idle timeout is a backstop, never the liveness mechanism.
+
+    The client keepalive is a JS setInterval, and browsers throttle timers in hidden
+    tabs: Firefox's budget throttling can delay a 10 s interval by up to 60 s, and
+    Chromium drops to one wake-up per minute ("intensive throttling") after ~5 minutes
+    hidden. A host tab that is backgrounded while the user walks to another device or
+    window is therefore silent for far longer than a short interval. When this timer was
+    30 s it reaped live hosts, and the guest got "Could not reach the host. The room may
+    no longer be active." even though the host's browser was still connected.
+
+    Liveness is enforced at the transport layer by uvicorn's WebSocket ping/pong (see the
+    Dockerfile CMD): control frames are answered by the browser's network stack, so they
+    are immune to JS timer throttling. Keep this backstop generous. (Verified against the
+    published pre-fix image: a host reaped at 30 s produced exactly those two errors.)
+    """
+
+    def test_idle_timeout_outlasts_background_tab_throttling(self):
+        # Firefox's budget throttling can delay a background timer by up to 60 s, so the
+        # backstop must sit comfortably above that, not just above the 10 s ping interval.
+        assert signaling._IDLE_TIMEOUT_SECONDS >= 120
+
+    def test_idle_timeout_is_longer_than_register_timeout(self):
+        assert signaling._IDLE_TIMEOUT_SECONDS > signaling._REGISTER_TIMEOUT_SECONDS

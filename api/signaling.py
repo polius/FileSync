@@ -34,7 +34,22 @@ _MAX_MSG_PER_SECOND = 100                # per-connection rate limit (all messag
 _PAIR_WINDOW_SECONDS = 10.0              # sliding-window length for per-target rate limit
 _PAIR_MAX_PER_WINDOW = 50                # max signal msgs from one source to one target per window
 _REGISTER_TIMEOUT_SECONDS = 10.0         # first message must arrive within this window
-_IDLE_TIMEOUT_SECONDS = 30.0             # close if no message at all (clients ping every 10s)
+# Close a registered socket after this long with no *application* message. This is a
+# coarse backstop only — it must never be the primary liveness mechanism.
+#
+# The client keepalive is a JS setInterval (peer.js:_startPing), and browsers throttle
+# timers in hidden tabs: Firefox aggressively, Chromium down to one wake-up per minute
+# ("intensive throttling") once the tab has been hidden for ~5 minutes. A host that
+# walks to another device/window is therefore routinely silent for far longer than any
+# short interval. When this timer was 30 s that reaped live hosts, so the guest got
+# "Could not reach the host" even though the host's browser was still connected.
+#
+# Real liveness is enforced at the transport layer by uvicorn's WebSocket ping/pong
+# (see the Dockerfile CMD): control frames are answered by the browser's network stack
+# and are immune to JS timer throttling, so a genuinely dead peer is still dropped in
+# ~ping_interval + ping_timeout seconds. This timer only needs to bound sockets that
+# stay transport-alive yet never speak, hence the deliberately generous value.
+_IDLE_TIMEOUT_SECONDS = 300.0            # 5 min: tolerate 1-wake/min hidden-tab throttling
 _MAX_CONNECTIONS = int(os.getenv("FILESYNC_MAX_WS", "10000"))
 
 # Client-host resolution cache (hostname -> IPv4) used for ICE relay rewriting. Bounded
@@ -86,8 +101,8 @@ class _PeerRegistry:
         case for "id already taken" is a stale connection from the same client whose TCP
         close hasn't been detected by the server yet — typically after a mobile network
         switch or a brief blip. Without takeover, the client would have to wait for the
-        idle timeout to expire (30 s) before they could reconnect. With takeover, the
-        reconnect is immediate.
+        idle timeout to expire (up to _IDLE_TIMEOUT_SECONDS) before they could
+        reconnect. With takeover, the reconnect is immediate.
 
         Security note: a peer who knows another peer's id (i.e., is already in the same
         room) can kick them off the signaling socket by registering with that id. The

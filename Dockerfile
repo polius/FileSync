@@ -69,4 +69,11 @@ EXPOSE 80
 # --ws-max-size caps WebSocket frames at the transport (uvicorn's default is 16 MiB,
 # which would be fully buffered before the app's own 32 KiB payload check runs);
 # 64 KiB leaves headroom over the signaling _MAX_PAYLOAD_BYTES limit.
-CMD ["bash", "-c", "su-exec nginx python3 -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --ws-max-size 65536 & nginx -g 'daemon off;' & wait -n"]
+#
+# --ws-ping-interval/--ws-ping-timeout pin uvicorn's transport-level keepalive. These
+# match uvicorn's defaults, but they are stated explicitly because the app's liveness
+# now depends on them: browsers answer WebSocket ping control frames in their network
+# stack, i.e. even for a throttled/frozen hidden tab whose JS timers have stopped. That
+# makes this the reliable liveness signal, which is why the signaling layer's own
+# app-message idle timeout can be generous (see api/signaling.py:_IDLE_TIMEOUT_SECONDS).
+CMD ["bash", "-c", "su-exec nginx python3 -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --ws-max-size 65536 --ws-ping-interval 20 --ws-ping-timeout 20 & nginx -g 'daemon off;' & wait -n"]
