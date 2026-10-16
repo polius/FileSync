@@ -1,0 +1,36 @@
+# Keep the build context small and prevent local/dev artifacts from leaking into the
+# image (Dockerfile does `COPY api` wholesale, so anything under api/ would ship).
+
+# Version control + CI
+.git
+.gitignore
+.gitattributes
+.github
+
+# Local dependencies / test artifacts (e2e/fixtures is ~1.6G after a local e2e run)
+node_modules
+**/node_modules
+e2e
+tests
+
+# Python bytecode must never be copied — a stale __pycache__ from a different
+# interpreter has been observed baked into the image otherwise.
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+
+# Docs / editor / misc noise
+*.md
+LICENSE
+.vscode
+.idea
+*.log
+*.tar
+
+# Local secrets and dev virtualenvs. The Dockerfile copies api/ wholesale, so a stray
+# api/.env (or a local venv) would otherwise be baked into a published image.
+.env
+.env.*
+.venv
+venv

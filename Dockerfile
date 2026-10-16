@@ -30,10 +30,15 @@ RUN find /install/lib/ -path "*/site-packages/tests" -type d -exec rm -rf {} + \
 # ==============================
 FROM python:3.14-alpine
 
-# Install Nginx runtime (+ bash for a reliable `wait -n` in the start command)
-RUN apk add --no-cache nginx bash
+# Install Nginx runtime (+ bash for a reliable `wait -n` in the start command, and
+# su-exec to run the backend as the unprivileged nginx user).
+RUN apk add --no-cache nginx bash su-exec
 
 WORKDIR /filesync
+
+# Never write .pyc at runtime: the app runs unprivileged, and bytecode in the image is
+# never wanted (see .dockerignore).
+ENV PYTHONDONTWRITEBYTECODE=1
 
 # Copy Python dependencies from builder
 COPY --from=builder /install /usr/local
@@ -56,7 +61,12 @@ EXPOSE 80
 # container stops (and `restart: unless-stopped` restarts it) if the backend dies —
 # instead of nginx keeping a half-dead container alive indefinitely. (busybox sh's
 # `wait -n` does not reliably fire for a backgrounded child as PID 1, so we use bash.)
+#
+# The backend runs as the unprivileged `nginx` user via su-exec (which execs, so the
+# backgrounded PID is the backend itself and `wait -n` still works). Only the nginx
+# master needs root, to bind :80 and drop its workers to `nginx`.
+#
 # --ws-max-size caps WebSocket frames at the transport (uvicorn's default is 16 MiB,
 # which would be fully buffered before the app's own 32 KiB payload check runs);
 # 64 KiB leaves headroom over the signaling _MAX_PAYLOAD_BYTES limit.
-CMD ["bash", "-c", "python3 -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --ws-max-size 65536 & nginx -g 'daemon off;' & wait -n"]
+CMD ["bash", "-c", "su-exec nginx python3 -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --ws-max-size 65536 & nginx -g 'daemon off;' & wait -n"]

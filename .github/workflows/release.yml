@@ -5,8 +5,33 @@ on:
     types: [published]
 
 jobs:
+  # Gate the publish on the same checks that protect main. A release can be created from
+  # any ref (and from a tag that never ran on main), so run the tests here rather than
+  # trusting that the checks workflow already passed.
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - run: pip install -r api/requirements.txt pytest ruff
+      - run: ruff check api tests
+      - env:
+          SECRET_KEY: ci-not-a-real-secret
+        run: python -c "import api.main, api.signaling; print('import OK')"
+      - run: python -m pytest tests -q
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+
   push_to_registry:
     name: Push Docker image to Docker Hub
+    needs: verify
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -24,22 +49,27 @@ jobs:
           username: poliuscorp
           password: ${{ secrets.DOCKER_ACCESS_TOKEN }}
 
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: poliuscorp/filesync
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
       - name: Derive version tag from the git ref
         id: tag
         run: |
           # Strip a leading "v" and an optional "." so both v4.0.0 and v.4.0.0 -> 4.0.0.
           SHORT_TAG="${GITHUB_REF_NAME#v}"
           SHORT_TAG="${SHORT_TAG#.}"
-          echo "SHORT_TAG=$SHORT_TAG" >> $GITHUB_OUTPUT
+          echo "short_tag=$SHORT_TAG" >> $GITHUB_OUTPUT
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: poliuscorp/filesync
+          # Do not move the `latest` tag for a pre-release.
+          flavor: |
+            latest=${{ !github.event.release.prerelease }}
+          tags: |
+            type=raw,value=${{ steps.tag.outputs.short_tag }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
 
       - name: Build and push Docker image
         id: push
@@ -48,9 +78,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: |
-            poliuscorp/filesync:latest 
-            poliuscorp/filesync:${{ steps.tag.outputs.short_tag }}
+          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
 

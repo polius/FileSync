@@ -43,3 +43,16 @@ updates:
         update-types:
           - "minor"
           - "patch"
+
+  # Frontend lint/test tooling (root package.json). Without this entry, Dependabot
+  # never bumps eslint / its transitive deps, so `npm audit` findings on that tree go
+  # unaddressed.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    groups:
+      npm-minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"

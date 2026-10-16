@@ -1,5 +1,20 @@
+# Shared hardening for every service in this stack: block privilege escalation, and
+# bound container logs so a runaway log line cannot fill the host disk (the default
+# json-file driver is unbounded).
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
 services:
   filesync:
+    # The project's own image, built and attested by .github/workflows/release.yml
+    # (which tags it :latest). For a frozen production artifact, pin a released version
+    # or digest here, e.g. `image: poliuscorp/filesync:4.3.0`.
     image: poliuscorp/filesync
     container_name: filesync-app
     environment:
@@ -14,32 +29,24 @@ services:
       init:
         condition: service_completed_successfully
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1g
+          pids: 512
+    <<: *hardening
 
   coturn:
-    image: coturn/coturn:alpine
+    # Pinned: third-party image sitting directly on the media path.
+    image: coturn/coturn:4.18.0-alpine
     container_name: filesync-coturn
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        secret=$$(cat /keys/secret) && exec turnserver \
-          --fingerprint \
-          --use-auth-secret \
-          --no-multicast-peers \
-          --denied-peer-ip=10.0.0.0-10.255.255.255 \
-          --denied-peer-ip=172.16.0.0-172.31.255.255 \
-          --denied-peer-ip=192.168.0.0-192.168.255.255 \
-          --denied-peer-ip=100.64.0.0-100.127.255.255 \
-          --denied-peer-ip=169.254.0.0-169.254.255.255 \
-          --denied-peer-ip=fc00::-fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff \
-          --denied-peer-ip=fe80::-febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff \
-          --no-cli \
-          --realm=filesync.app \
-          --static-auth-secret="$$secret" \
-          --listening-port=3478 \
-          --min-port=50000 \
-          --max-port=50100
+    # All turnserver flags live in the shared script (see deploy/coturn-entrypoint.sh),
+    # so this file and docker-compose-ssl.yml cannot diverge.
+    entrypoint: ["/bin/sh", "/coturn-entrypoint.sh"]
     volumes:
       - keys:/keys:ro
+      - ./coturn-entrypoint.sh:/coturn-entrypoint.sh:ro
     depends_on:
       init:
         condition: service_completed_successfully
@@ -48,6 +55,13 @@ services:
       - "3478:3478/udp"
       - "50000-50100:50000-50100/udp"
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512m
+          pids: 256
+    <<: *hardening
 
   init:
     image: poliuscorp/filesync
@@ -55,6 +69,7 @@ services:
     command: python3 api/init_secret.py
     volumes:
       - keys:/keys
+    <<: *hardening
 
 volumes:
   keys:

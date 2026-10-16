@@ -8,17 +8,27 @@ on:
 jobs:
   # Builds the multi-stage image. This is the highest-value gate: it exercises the
   # Dockerfile base-image bump and proves api/requirements.txt installs cleanly inside
-  # the image (the builder stage runs `pip install -r requirements.txt`).
+  # the image (the builder stage runs `pip install -r requirements.txt`). Then scans the
+  # built image for unfixed CRITICAL vulnerabilities.
   docker:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - run: docker build -t filesync:ci .
+      - name: Scan image (CRITICAL, fixed-only)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: filesync:ci
+          format: table
+          exit-code: '1'
+          severity: 'CRITICAL'
+          ignore-unfixed: true
 
-  # Installs the backend deps, imports the app modules, and runs the backend unit
-  # tests. The import check catches dependency bumps that break imports (a plain
-  # syntax check would miss runtime import errors); main.py refuses to import without
-  # SECRET_KEY, so pass a throwaway value.
+  # Installs the backend deps, imports the app modules, runs the backend unit tests with
+  # coverage, and audits the pinned dependency set for known vulnerabilities. The import
+  # check catches dependency bumps that break imports (a plain syntax check would miss
+  # runtime import errors); main.py refuses to import without SECRET_KEY, so pass a
+  # throwaway value.
   python:
     runs-on: ubuntu-latest
     steps:
@@ -26,13 +36,15 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
-      - run: pip install -r api/requirements.txt pytest
+      - run: pip install -r api/requirements.txt pytest pytest-cov pip-audit
+      - run: pip-audit -r api/requirements.txt
       - env:
           SECRET_KEY: ci-not-a-real-secret
         run: python -c "import api.main, api.signaling; print('import OK')"
-      - run: python -m pytest tests -q
+      - run: python -m pytest tests -q --cov=api --cov-report=term-missing
 
-  # Static analysis for both sides of the app, plus the JS unit tests (node:test).
+  # Static analysis for both sides of the app, plus the JS unit tests (node:test). JS
+  # coverage is collected for visibility into the transfer state machine.
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -47,8 +59,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm audit --audit-level=high
       - run: npm run lint
-      - run: npm test
+      - run: npm run test:coverage
 
   # End-to-end smoke: real Chromium pair exchanging a 100 MB file through the actual
   # container (nginx + FastAPI signaling), verified by SHA-256. Uses the exact compose
