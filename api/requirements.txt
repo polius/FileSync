@@ -1,2 +1,8 @@
-fastapi[standard]>=0.142.2,<1.0
-PyJWT>=2.15.1,<3.0
+# Pinned for reproducible production builds (Dependabot proposes updates).
+# Deliberately NOT fastapi[standard]: this service is a small signaling relay and does
+# not use the FastAPI CLI, cloud client, telemetry/Sentry, or rich/typer stack that the
+# [standard] extra pulls in. uvicorn[standard] supplies the ASGI server plus the
+# websockets/uvloop/httptools it needs on Linux.
+fastapi==0.143.3
+uvicorn[standard]==0.54.0
+PyJWT==2.15.1
