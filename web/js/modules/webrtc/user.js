@@ -678,9 +678,11 @@ export class User {
   }
 
   // Terminal-but-resumable row state: bytes are kept, the download button retries.
+  // The download control MUST stay visible here — the error text tells the user to
+  // click it, and it is the only way back into downloadFile()'s resume branch.
   _showResumeAvailable(file) {
     const pct = this._resumePercent(file);
-    this._setRowState(file.id, { failed: true });
+    this._setRowState(file.id, { failed: true, download: true });
     this._resetResumeButton(file.id);
     this._setFileProgressText(file.id, `${pct}% | `);
     const errEl = document.getElementById(`file-${file.id}-error`);
@@ -783,6 +785,13 @@ export class User {
   }
 
   async downloadAll() {
+    // Guard against a second invocation: overwriting this._downloadAll would orphan the
+    // previous run's progress interval and mix two bundles into one modal.
+    if (this._downloadAll?.active) {
+      showToast('A bundle download is already in progress.', 'warning');
+      return;
+    }
+
     // Init UI Components
     dom.download_modal_value.innerHTML = '0%'
     dom.download_modal_active.querySelector('.progress-bar').style.width = '0%'
@@ -1602,10 +1611,10 @@ export class User {
 
         <div class="col d-flex flex-column" style="overflow-x: hidden; padding-left:0px;">
           <div style="margin-bottom: 5px; font-size: 0.875rem; font-weight: 500; text-align: left; word-break: break-all;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-arrow-up-short" viewBox="0 0 16 16"; style="margin-top:-3px; margin-right:-3px; margin-left:-5px; display: ${isMine ? 'block-inline' : 'none'}">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-arrow-up-short" viewBox="0 0 16 16"; style="margin-top:-3px; margin-right:-3px; margin-left:-5px; display: ${isMine ? 'inline-block' : 'none'}">
             <path fill-rule="evenodd" d="M8 12a.5.5 0 0 0 .5-.5V5.707l2.146 2.147a.5.5 0 0 0 .708-.708l-3-3a.5.5 0 0 0-.708 0l-3 3a.5.5 0 1 0 .708.708L7.5 5.707V11.5a.5.5 0 0 0 .5.5z"/>
           </svg>
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-arrow-down-short" viewBox="0 0 16 16" style="margin-top:-3px; margin-right:-3px; margin-left:-5px; display: ${isMine ? 'none' : 'block-inline'}">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-arrow-down-short" viewBox="0 0 16 16" style="margin-top:-3px; margin-right:-3px; margin-left:-5px; display: ${isMine ? 'none' : 'inline-block'}">
             <path fill-rule="evenodd" d="M8 4a.5.5 0 0 1 .5.5v5.793l2.146-2.147a.5.5 0 0 1 .708.708l-3 3a.5.5 0 0 1-.708 0l-3-3a.5.5 0 1 1 .708-.708L7.5 10.293V4.5A.5.5 0 0 1 8 4z"/>
           </svg>
           <span id="file-${file.id}-name"></span></div>
@@ -1614,7 +1623,7 @@ export class User {
           <div id="file-${file.id}-details" style="color: #0d6efd; font-size: .9rem; font-weight: 500; text-align: left; padding-top:5px; padding-bottom:4px; padding-right:4px; cursor:pointer; display: ${isMine ? 'block' : 'none'}">See details</div>
         </div>
 
-        <div id="file-${file.id}-remove" class="col-auto text-end" title="Remove file" style="cursor: pointer; display: ${isMine ? 'block-inline' : 'none'}">
+        <div id="file-${file.id}-remove" class="col-auto text-end" title="Remove file" style="cursor: pointer; display: ${isMine ? 'inline-block' : 'none'}">
           <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="#dc3545" class="bi bi-x-circle" viewBox="0 0 16 16">
             <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
             <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
@@ -1626,7 +1635,7 @@ export class User {
             <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
           </svg>
         </div>
-        <div id="file-${file.id}-download" class="col-auto text-end" title="Download file" style="cursor: pointer; display: ${isMine ? 'none' : 'block-inline'}">
+        <div id="file-${file.id}-download" class="col-auto text-end" title="Download file" style="cursor: pointer; display: ${isMine ? 'none' : 'inline-block'}">
           <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="#0d6efd" class="bi bi-arrow-down-circle" viewBox="0 0 16 16">
             <path fill-rule="evenodd" d="M1 8a7 7 0 1 0 14 0A7 7 0 0 0 1 8zm15 0A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8.5 4.5a.5.5 0 0 0-1 0v5.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V4.5z"/>
           </svg>
