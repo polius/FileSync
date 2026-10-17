@@ -19,7 +19,6 @@ jobs:
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: filesync:ci
-          format: table
           exit-code: '1'
           severity: 'CRITICAL'
           ignore-unfixed: true
