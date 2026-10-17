@@ -48,6 +48,9 @@
   --shadow-lg: 0 10px 25px -5px rgba(0,0,0,0.08), 0 8px 10px -6px rgba(0,0,0,0.04);
   --radius: 12px;
   --radius-lg: 16px;
+  --round-hover: rgba(13,17,23,0.065);
+  --accent-ring: rgba(252,145,45,0.32);
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 :root.dark {
@@ -72,6 +75,9 @@
   --shadow-lg: 0 10px 25px -5px rgba(0,0,0,0.4), 0 8px 10px -6px rgba(0,0,0,0.3);
   --radius: 12px;
   --radius-lg: 16px;
+  --round-hover: rgba(255,255,255,0.10);
+  --accent-ring: rgba(252,145,45,0.36);
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 /* --- Base & Typography --- */
@@ -270,18 +276,76 @@ textarea::-webkit-scrollbar-thumb {
   color: var(--color-p) !important;
 }
 
-.card .card-header .card-header-action {
+.card .card-header .fx-action {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-p);
+  font-family: 'Inter', sans-serif;
   font-size: 13px;
   font-weight: 500;
-  text-transform: none;
   letter-spacing: 0;
-  color: var(--color-p) !important;
+  line-height: 1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
   cursor: pointer;
-  transition: color 0.15s ease;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  /* Optical alignment: the header carries 18px of padding and the pill adds 10px of its
+     own, so the action is pulled back until its label lines up with the Users/Files label. */
+  margin-right: -10px;
+  transition:
+    background-color 0.18s var(--ease),
+    color 0.18s var(--ease),
+    box-shadow 0.18s var(--ease),
+    transform 0.12s var(--ease);
 }
 
-.card .card-header .card-header-action:hover {
-  color: var(--color-url) !important;
+.card .card-header .fx-action .fx-ico {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  display: grid;
+  place-items: center;
+}
+
+.card .card-header .fx-action .fx-ico svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  fill: currentColor;
+}
+
+/* The round surface, revealed on hover. */
+.card .card-header .fx-action:hover {
+  background: var(--round-hover);
+  color: var(--color-h1);
+}
+
+.card .card-header .fx-action:active {
+  background: var(--round-hover);
+  color: var(--color-h1);
+  transform: scale(0.97);
+}
+
+.card .card-header .fx-action:focus-visible {
+  outline: none;
+  border-color: #FC912D;
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.card .card-header .fx-action:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+  cursor: default;
 }
 
 .card .list-group-item {
