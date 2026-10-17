@@ -75,7 +75,7 @@
   --shadow-lg: 0 10px 25px -5px rgba(0,0,0,0.4), 0 8px 10px -6px rgba(0,0,0,0.3);
   --radius: 12px;
   --radius-lg: 16px;
-  --round-hover: rgba(255,255,255,0.10);
+  --round-hover: rgba(255,255,255,0.06);
   --accent-ring: rgba(252,145,45,0.36);
   --ease: cubic-bezier(0.32, 0.72, 0, 1);
 }
@@ -302,6 +302,9 @@ textarea::-webkit-scrollbar-thumb {
   /* Optical alignment: the header carries 18px of padding and the pill adds 10px of its
      own, so the action is pulled back until its label lines up with the Users/Files label. */
   margin-right: -10px;
+  /* Neutralise the extra height: the header row is 21.5px, so a 28px pill would grow the
+     header by 6.5px. The pill keeps its size (and hit area) but bleeds into the padding. */
+  margin-block: -5.5px;
   transition:
     background-color 0.18s var(--ease),
     color 0.18s var(--ease),
