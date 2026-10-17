@@ -678,8 +678,7 @@ export class User {
   }
 
   // Terminal-but-resumable row state: bytes are kept, the download button retries.
-  // The download control MUST stay visible here — the error text tells the user to
-  // click it, and it is the only way back into downloadFile()'s resume branch.
+  // Keep the download control visible: it's the only route back into the resume branch.
   _showResumeAvailable(file) {
     const pct = this._resumePercent(file);
     this._setRowState(file.id, { failed: true, download: true });
@@ -785,8 +784,7 @@ export class User {
   }
 
   async downloadAll() {
-    // Guard against a second invocation: overwriting this._downloadAll would orphan the
-    // previous run's progress interval and mix two bundles into one modal.
+    // Guard against re-entry: a second run would orphan the first run's progress interval.
     if (this._downloadAll?.active) {
       showToast('A bundle download is already in progress.', 'warning');
       return;

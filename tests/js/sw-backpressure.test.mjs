@@ -1,7 +1,4 @@
-// Service-Worker streaming backpressure tests (C3): drive the REAL web/sw.js credit
-// protocol with a stubbed ServiceWorkerGlobalScope, a MessageChannel and a ReadableStream.
-//
-// Run: node --test --test-force-exit "tests/js/*.test.mjs"
+// SW streaming backpressure tests (C3). Run: node --test --test-force-exit "tests/js/*.test.mjs"
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -101,8 +98,7 @@ test('a page that ignores its window gains no credit, and still loses no bytes',
   const t = register('t3');
   await sleep(20);
   const reader = t.fetchResponse().body.getReader();
-  // Over-send: the worker enqueues (the window is advisory) but must never grant credit
-  // for memory the consumer has not actually freed.
+  // Over-send must never grant credit for memory the consumer has not freed.
   for (let i = 0; i < WINDOW + 20; i++) t.port.postMessage(chunk());
   await sleep(80);
   assert.equal(t.credits(), WINDOW, 'over-sending must not buy additional credit');

@@ -30,14 +30,12 @@ RUN find /install/lib/ -path "*/site-packages/tests" -type d -exec rm -rf {} + \
 # ==============================
 FROM python:3.14-alpine
 
-# Install Nginx runtime (+ bash for a reliable `wait -n` in the start command, and
-# su-exec to run the backend as the unprivileged nginx user).
+# Nginx, bash (for `wait -n`), su-exec (run the backend unprivileged).
 RUN apk add --no-cache nginx bash su-exec
 
 WORKDIR /filesync
 
-# Never write .pyc at runtime: the app runs unprivileged, and bytecode in the image is
-# never wanted (see .dockerignore).
+# Never write .pyc at runtime.
 ENV PYTHONDONTWRITEBYTECODE=1
 
 # Copy Python dependencies from builder
@@ -57,12 +55,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 # Expose ports
 EXPOSE 80
 
-# Start FastAPI + Nginx. `wait -n` exits as soon as either dies, so a dead backend stops
-# the container instead of being masked by nginx (bash; busybox `wait -n` is unreliable
-# here). The backend runs unprivileged via su-exec; only nginx needs root for :80.
-#
-# --ws-max-size caps frames at the transport (uvicorn defaults to 16 MiB, buffered before
-# the app's 32 KiB check). Liveness is uvicorn's default WebSocket ping/pong (20 s/20 s):
-# control frames are answered by the browser's network stack even in a throttled hidden
-# tab, which is why signaling.py's app-message idle timeout can be generous.
+# Start FastAPI and nginx; `wait -n` stops the container if either dies.
 CMD ["bash", "-c", "su-exec nginx python3 -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --ws-max-size 65536 & nginx -g 'daemon off;' & wait -n"]

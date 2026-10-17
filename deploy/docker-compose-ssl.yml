@@ -1,5 +1,4 @@
-# TLS topology: Caddy terminates HTTPS and proxies to the stack. Kept in sync with
-# docker-compose.yml.
+# TLS topology: Caddy terminates HTTPS and proxies to the stack (mirrors docker-compose.yml).
 
 services:
   caddy:
@@ -16,8 +15,7 @@ services:
     restart: unless-stopped
 
   filesync:
-    # The project's own image, built and attested by .github/workflows/release.yml.
-    # Pin a released version or digest for a frozen production artifact.
+    # Built and attested by .github/workflows/release.yml; pin a version for production.
     image: poliuscorp/filesync
     container_name: filesync-app
     environment:
@@ -35,8 +33,7 @@ services:
     # Pinned: third-party image sitting directly on the media path.
     image: coturn/coturn:4.18.0-alpine
     container_name: filesync-coturn
-    # Shell wrapper reads the shared secret from the keys volume at start, then
-    # execs turnserver. Same launcher as the main branch.
+    # Read the shared secret from /keys, then exec turnserver.
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |

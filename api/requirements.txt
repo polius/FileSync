@@ -1,5 +1,4 @@
-# Pinned for reproducible builds (Dependabot proposes updates). Deliberately not
-# fastapi[standard]: a small signaling relay does not need the CLI/cloud/rich stack it pulls in.
+# Pinned for reproducible builds; not fastapi[standard] (unneeded extras).
 fastapi==0.143.3
 uvicorn[standard]==0.54.0
 PyJWT==2.15.1

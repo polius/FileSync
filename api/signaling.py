@@ -34,14 +34,11 @@ _MAX_MSG_PER_SECOND = 100                # per-connection rate limit (all messag
 _PAIR_WINDOW_SECONDS = 10.0              # sliding-window length for per-target rate limit
 _PAIR_MAX_PER_WINDOW = 50                # max signal msgs from one source to one target per window
 _REGISTER_TIMEOUT_SECONDS = 10.0         # first message must arrive within this window
-# Coarse backstop for sockets that stay transport-alive yet never speak. Real liveness is
-# uvicorn's WebSocket ping/pong (see the Dockerfile CMD), which survives hidden-tab timer
-# throttling; the client ping is a JS interval, so this must tolerate a throttled tab.
+# Coarse backstop; real liveness is uvicorn's WS ping/pong (see the Dockerfile CMD).
 _IDLE_TIMEOUT_SECONDS = 300.0            # 5 min: tolerate 1-wake/min hidden-tab throttling
 _MAX_CONNECTIONS = int(os.getenv("FILESYNC_MAX_WS", "10000"))
 
-# Host-header resolution cache for ICE relay rewriting. Size- and age-bounded because the
-# key is attacker-controlled.
+# Host-header cache for ICE relay rewriting; bounded (attacker-controlled key).
 _HOST_CACHE_MAX = 1024
 _HOST_CACHE_TTL_SECONDS = 600.0
 
@@ -59,8 +56,7 @@ class _PeerRegistry:
 
     def __init__(self) -> None:
         self._peers: Dict[str, WebSocket] = {}
-        # Every accepted socket, registered or not: a socket has no peer id until it
-        # registers, so len(_peers) would leave the register window uncounted.
+        # Every accepted socket, registered or not.
         self._connections = 0
         self._lock = asyncio.Lock()
 
@@ -231,13 +227,7 @@ _host_resolutions: Dict[str, tuple] = {}
 
 
 async def _resolve_host(host: str) -> Optional[str]:
-    """Resolve a hostname to an IPv4 literal for ICE candidate rewriting. Returns None
-    when the host is already an IP literal or cannot be resolved.
-
-    The lookup runs on asyncio's thread pool (loop.getaddrinfo). Calling the blocking
-    socket.getaddrinfo here would stall the single event loop — and thus every other
-    WebSocket and HTTP request — for the duration of the lookup, which an attacker can
-    trigger at will by choosing the Host header."""
+    """Resolve a hostname to an IPv4 literal; uses loop.getaddrinfo (never blocks)."""
     now = time.monotonic()
     cached = _host_resolutions.get(host)
     if cached is not None and now - cached[0] < _HOST_CACHE_TTL_SECONDS:
@@ -339,8 +329,7 @@ router = APIRouter()
 
 @router.websocket("/ws")
 async def signaling(websocket: WebSocket):
-    # Reserve a slot before accept to refuse early under overload (counts unregistered
-    # sockets too; see _PeerRegistry.acquire).
+    # Reserve a slot before accept to refuse early under overload.
     if not await _REGISTRY.acquire():
         await websocket.close(code=_CLOSE_OVERLOADED, reason="Server at capacity.")
         return

@@ -10,9 +10,7 @@
 //   { type: 'end' }           -> stream is closed cleanly
 //   { type: 'abort' }         -> stream is errored (browser will show an incomplete download)
 //
-// Flow control (worker -> page): the worker hands out a bounded window of credits and tops
-// it up as the consumer drains (controller.desiredSize), so the queue never grows with the
-// file size.
+// Flow control (worker -> page): a bounded credit window, topped up as the consumer drains.
 //
 // The transfer entry deliberately stays in the map after 'end': in Firefox the
 // navigation's fetch event can arrive AFTER the page finished streaming (fast
@@ -54,14 +52,12 @@ self.addEventListener('message', (event) => {
     { highWaterMark: WINDOW_CHUNKS },
   );
 
-  // Hand the page as much credit as there is room for. `creditsOutstanding` counts grants
-  // not yet filled by an incoming chunk, so we never over-grant.
+  // Hand the page as much credit as there is room for (never over-grant).
   function topUp() {
     if (finished || !controller) return;
     const room = controller.desiredSize;
     if (room === null) {
-      // Stream closed or errored (e.g. the page went away mid-transfer): stop the timer
-      // so it cannot keep this Service Worker alive indefinitely.
+      // Stream closed/errored (page gone): stop the timer.
       finished = true;
       clearInterval(timer);
       return;

@@ -54,8 +54,7 @@ if _cors_origins:
 async def root():
     return {"message": "Welcome to FileSync API!", "version": app.version}
 
-# Add health check route. Reports signaling capacity as well as liveness so a monitor
-# can alert on "no peers" / "at capacity" rather than just up/down.
+# Add health check route reporting liveness + signaling capacity.
 @app.get("/health")
 async def health_check():
     return {"message": "FileSync API is running!", **registry_stats()}

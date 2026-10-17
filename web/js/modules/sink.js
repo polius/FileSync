@@ -203,9 +203,7 @@ function extensionFromName(name) {
 // A failed/interrupted transfer therefore never leaves a partial download behind, and
 // the staged file doubles as the resume buffer across reconnections.
 //
-// Note: the staged file is re-emitted as the download, so this needs ~2x the size in free
-// space and is subject to the OPFS quota (hence FS is preferred where available). Delivery
-// to the worker is credit-gated (see sw.js) so a slow consumer cannot balloon memory.
+// The staged file is re-emitted as the download: ~2x free space, OPFS-quota subject.
 
 // Abandoned staging files (transfer interrupted, then the tab closed) are swept on boot.
 const _STAGING_PREFIX = 'filesync-part-';
@@ -307,8 +305,7 @@ async function openSwSink({ id, name, size, mime }) {
       }
       port.postMessage({ type: 'end' });
     } catch (err) {
-      // Tear the worker side down so it does not hold a half-open download response
-      // (and its credit timer) open until the Service Worker is evicted.
+      // Tear down the worker side so it doesn't hold a half-open response open.
       try { port.postMessage({ type: 'abort', reason: err && err.message }); } catch {}
       throw err;
     } finally {

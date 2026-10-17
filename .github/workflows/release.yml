@@ -5,8 +5,7 @@ on:
     types: [published]
 
 jobs:
-  # A release can be cut from any ref (even one that never ran on main), so gate the
-  # publish on the tests here.
+  # Releases can be cut from any ref, so gate publishing on the tests.
   verify:
     runs-on: ubuntu-latest
     steps:

@@ -1,7 +1,4 @@
-// OPFS staging-sweep tests (C4): sweepStaleStaging() reclaims files abandoned by closed
-// tabs on boot, but must never touch a fresh in-progress file or foreign entries.
-//
-// Run: node --test --test-force-exit "tests/js/*.test.mjs"
+// OPFS staging-sweep tests (C4). Run: node --test --test-force-exit "tests/js/*.test.mjs"
 
 import test from 'node:test';
 import assert from 'node:assert/strict';

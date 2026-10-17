@@ -192,13 +192,7 @@ class TestResolveHost:
         assert calls == ["b.example", "b.example"], "expired entry must be re-resolved"
 
     def test_resolution_does_not_block_the_event_loop(self, monkeypatch):
-        """A1 regression guard.
-
-        The original code called the blocking socket.getaddrinfo() directly on the event
-        loop, so one slow lookup (trivially forced by an attacker-chosen Host header)
-        stalled every other WebSocket and HTTP request. Resolution now runs on the loop's
-        executor, so an unrelated task must keep making progress while a name resolves.
-        """
+        """A1 guard: a slow lookup must not block the event loop."""
         signaling._host_resolutions.clear()
         real_getaddrinfo = socket.getaddrinfo
 
@@ -257,25 +251,10 @@ class TestConnectionCapacity:
 
 
 class TestIdleTimeoutTolerance:
-    """The app-message idle timeout is a backstop, never the liveness mechanism.
-
-    The client keepalive is a JS setInterval, and browsers throttle timers in hidden
-    tabs: Firefox's budget throttling can delay a 10 s interval by up to 60 s, and
-    Chromium drops to one wake-up per minute ("intensive throttling") after ~5 minutes
-    hidden. A host tab that is backgrounded while the user walks to another device or
-    window is therefore silent for far longer than a short interval. When this timer was
-    30 s it reaped live hosts, and the guest got "Could not reach the host. The room may
-    no longer be active." even though the host's browser was still connected.
-
-    Liveness is enforced at the transport layer by uvicorn's WebSocket ping/pong (see the
-    Dockerfile CMD): control frames are answered by the browser's network stack, so they
-    are immune to JS timer throttling. Keep this backstop generous. (Verified against the
-    published pre-fix image: a host reaped at 30 s produced exactly those two errors.)
-    """
+    """Idle timeout is a backstop; real liveness is uvicorn's WS ping/pong (see Dockerfile)."""
 
     def test_idle_timeout_outlasts_background_tab_throttling(self):
-        # Firefox's budget throttling can delay a background timer by up to 60 s, so the
-        # backstop must sit comfortably above that, not just above the 10 s ping interval.
+        # Firefox can delay a background timer by up to 60 s, so the backstop sits above that.
         assert signaling._IDLE_TIMEOUT_SECONDS >= 120
 
     def test_idle_timeout_is_longer_than_register_timeout(self):

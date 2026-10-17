@@ -6,10 +6,7 @@ on:
   pull_request:
 
 jobs:
-  # Builds the multi-stage image. This is the highest-value gate: it exercises the
-  # Dockerfile base-image bump and proves api/requirements.txt installs cleanly inside
-  # the image (the builder stage runs `pip install -r requirements.txt`). Then scans the
-  # built image for unfixed CRITICAL vulnerabilities.
+  # Builds the image, then scans it for unfixed CRITICAL vulnerabilities.
   docker:
     runs-on: ubuntu-latest
     steps:
@@ -23,8 +20,7 @@ jobs:
           severity: 'CRITICAL'
           ignore-unfixed: true
 
-  # Backend deps + import check (catches dependency bumps a syntax check would miss) +
-  # tests with coverage + pip-audit. main.py needs a SECRET_KEY to import.
+  # Backend deps, import check, tests with coverage, pip-audit.
   python:
     runs-on: ubuntu-latest
     steps:
@@ -39,8 +35,7 @@ jobs:
         run: python -c "import api.main, api.signaling; print('import OK')"
       - run: python -m pytest tests -q --cov=api --cov-report=term-missing
 
-  # Static analysis for both sides of the app, plus the JS unit tests (node:test). JS
-  # coverage is collected for visibility into the transfer state machine.
+  # Static analysis + JS unit tests.
   lint:
     runs-on: ubuntu-latest
     steps:

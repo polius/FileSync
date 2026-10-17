@@ -1,8 +1,4 @@
-// Resume-UI regression tests (C1): the "resumable" row state must keep the Download
-// control visible, since it is the only route back into User.downloadFile()'s resume
-// branch. Drives the REAL User class against a minimal DOM stub.
-//
-// Run: node --test --test-force-exit "tests/js/*.test.mjs"
+// Resume-UI regression tests (C1). Run: node --test --test-force-exit "tests/js/*.test.mjs"
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
