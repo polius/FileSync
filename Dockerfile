@@ -62,7 +62,7 @@ EXPOSE 80
 # here). The backend runs unprivileged via su-exec; only nginx needs root for :80.
 #
 # --ws-max-size caps frames at the transport (uvicorn defaults to 16 MiB, buffered before
-# the app's 32 KiB check). --ws-ping-interval/--ws-ping-timeout are the real liveness
-# signal: control frames are answered by the browser's network stack even in a throttled
-# hidden tab, which is why signaling.py's app-message idle timeout can be generous.
-CMD ["bash", "-c", "su-exec nginx python3 -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --ws-max-size 65536 --ws-ping-interval 20 --ws-ping-timeout 20 & nginx -g 'daemon off;' & wait -n"]
+# the app's 32 KiB check). Liveness is uvicorn's default WebSocket ping/pong (20 s/20 s):
+# control frames are answered by the browser's network stack even in a throttled hidden
+# tab, which is why signaling.py's app-message idle timeout can be generous.
+CMD ["bash", "-c", "su-exec nginx python3 -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --ws-max-size 65536 & nginx -g 'daemon off;' & wait -n"]
