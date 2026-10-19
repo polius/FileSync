@@ -8,7 +8,7 @@
     "test:coverage": "node --test --test-force-exit --experimental-test-coverage \"tests/js/*.test.mjs\""
   },
   "devDependencies": {
-    "eslint": "^10.12.0",
+    "eslint": "^10.13.0",
     "globals": "^17.13.0"
   }
 }
