@@ -5,7 +5,7 @@
 # ==============================
 # Stage 1: Build Python dependencies
 # ==============================
-FROM python:3.14-alpine AS builder
+FROM python:3.15-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache --virtual .build-deps build-base libffi-dev musl-dev python3-dev
@@ -28,7 +28,7 @@ RUN find /install/lib/ -path "*/site-packages/tests" -type d -exec rm -rf {} + \
 # ==============================
 # Stage 2: Runtime image
 # ==============================
-FROM python:3.14-alpine
+FROM python:3.15-alpine
 
 # Nginx, bash (for `wait -n`), su-exec (run the backend unprivileged).
 RUN apk add --no-cache nginx bash su-exec
