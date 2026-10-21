@@ -1,4 +1,4 @@
 # Pinned for reproducible builds; not fastapi[standard] (unneeded extras).
-fastapi==0.143.3
+fastapi==0.146.0
 uvicorn[standard]==0.54.0
 PyJWT==2.15.1
