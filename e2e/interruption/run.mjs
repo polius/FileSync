@@ -282,7 +282,7 @@ async function pair({ senderB, receiverB, qs }) {
 
   await sender.goto(`${BASE_URL}/?${qs}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await sender.waitForSelector('#room', { state: 'visible', timeout: 30000 });
-  const shareUrl = await sender.inputValue('#share-link', { timeout: 30000 });
+  const shareUrl = await sender.getAttribute('#share-link', 'data-link', { timeout: 30000 });
   if (!shareUrl) throw new Error('no share URL');
 
   const u = new URL(shareUrl);

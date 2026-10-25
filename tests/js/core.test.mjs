@@ -194,6 +194,13 @@ test('texts: empty bodies rejected, length capped, CRLF normalized', () => {
   assert.deepEqual(relayed.item, { id: 'a', from: 'g', name: 'N', body: 'hi', at: 5 });
 });
 
+test('text deletes carry only a valid message id', () => {
+  assert.deepEqual(protocol.parse({ t: 'text-delete', id: 'm1', from: 'someone-else' }), { t: 'text-delete', id: 'm1' });
+  assert.equal(protocol.parse({ t: 'text-delete', id: '../x' }), null);
+  assert.equal(protocol.parse({ t: 'text-delete' }), null);
+  assert.equal(protocol.hostAccepts('text-delete', true), true);
+});
+
 test('transfer messages need valid ids and non-negative integer offsets', () => {
   assert.ok(protocol.parse({ t: 'get', xfer: 'x1', file: 'f1', offset: 0 }));
   assert.equal(protocol.parse({ t: 'get', xfer: 'x1', file: 'f1', offset: -5 }), null);
@@ -203,12 +210,12 @@ test('transfer messages need valid ids and non-negative integer offsets', () => 
 
 test('who may send what (S2): room state only from the host, handshake before admission', () => {
   // Host side, before the password check: only the handshake.
-  for (const t of ['rename', 'file-add', 'file-remove', 'text', 'get']) assert.equal(protocol.hostAccepts(t, false), false, t);
+  for (const t of ['rename', 'file-add', 'file-remove', 'text', 'text-delete', 'get']) assert.equal(protocol.hostAccepts(t, false), false, t);
   for (const t of ['hello', 'auth-proof', 'bye']) assert.equal(protocol.hostAccepts(t, false), true, t);
   // A guest can never push room state to the host.
   for (const t of ['welcome', 'members', 'catalog', 'auth-challenge']) assert.equal(protocol.hostAccepts(t, true), false, t);
   // Guests accept room state from the host only.
-  for (const t of ['welcome', 'members', 'catalog', 'text']) {
+  for (const t of ['welcome', 'members', 'catalog', 'text', 'text-delete']) {
     assert.equal(protocol.guestAcceptsFromHost(t), true, t);
     assert.equal(protocol.guestAcceptsFromPeer(t), false, t);
   }

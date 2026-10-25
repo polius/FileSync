@@ -96,7 +96,7 @@ function boot() {
       document.getElementById('confirm-text').textContent = room.isHost
         ? 'Everyone in the room will be disconnected and transfers will stop.'
         : 'Your transfers will stop, and files you shared will no longer be available.';
-      document.getElementById('confirm-ok').textContent = 'Leave and start a new room';
+      document.getElementById('confirm-ok').textContent = 'Leave room';
       dlg.returnValue = '';
       dlg.addEventListener('close', () => { if (dlg.returnValue === 'ok') go(); }, { once: true });
       dlg.showModal();

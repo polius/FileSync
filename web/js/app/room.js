@@ -218,6 +218,21 @@ export class Room extends Emitter {
     return true;
   }
 
+  // Deletes one of your own messages for everyone, including people who join later. A guest
+  // asks the host, which removes it once it has checked who sent it. Returns false when the
+  // message isn't yours or a guest can't reach the host right now.
+  deleteText(id) {
+    const item = this.texts.find((t) => t.id === id && t.from === this.me.id);
+    if (!item) return false;
+    if (this.isHost) {
+      this.#dropText(item);
+      return true;
+    }
+    if (this.hostLink !== 'open') return false;
+    this.#toHost({ t: 'text-delete', id });
+    return true;
+  }
+
   // ---- downloading --------------------------------------------------------------------
 
   // Must be called straight from a click: the save picker needs the user gesture.
@@ -299,14 +314,15 @@ export class Room extends Emitter {
       }
     }
 
-    let reader = null;
+    // Cancelling aborts the current entry; its stream error ends the read loop below, and
+    // between entries the generator sees `aborted` and stops. No reader.cancel(): client-zip
+    // turns that into an unhandled iterator.throw() rejection.
     bundle.cancel = () => {
       aborted = aborted || new Error('cancelled');
       if (bundle.current && !bundle.current.finished) self.#finishDownload(bundle.current, 'cancelled');
-      reader?.cancel('cancelled').catch(() => {});
     };
     try {
-      reader = this.#deps.downloadZip(entries()).body.getReader();
+      const reader = this.#deps.downloadZip(entries()).body.getReader();
       for (;;) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -571,7 +587,13 @@ export class Room extends Emitter {
         return;
       }
       case 'text':
+        if (this.texts.some((t) => t.id === msg.id)) return; // ids must stay unique for deletes
         return this.#acceptText({ id: msg.id, from, name: this.members.get(from)?.name || 'Someone', body: msg.body, at: Date.now() });
+      case 'text-delete': {
+        const item = this.texts.find((t) => t.id === msg.id && t.from === from);
+        if (item) this.#dropText(item);
+        return;
+      }
       case 'bye':
         link.close('bye');
         return;
@@ -648,7 +670,13 @@ export class Room extends Emitter {
     this.texts.push(item);
     if (this.texts.length > MAX_TEXTS) this.texts.shift();
     if (this.isHost) for (const link of this.#admittedLinks()) link.send({ t: 'text', ...item });
-    if (item.from !== this.me.id) this.#toast(`New message from ${item.name}.`, 'info');
+    if (item.from !== this.me.id) this.#toast(`New message from ${item.name}.`, 'message');
+    this.#changed();
+  }
+
+  #dropText(item) {
+    this.texts = this.texts.filter((t) => t !== item);
+    if (this.isHost) for (const link of this.#admittedLinks()) link.send({ t: 'text-delete', id: item.id });
     this.#changed();
   }
 
@@ -696,6 +724,11 @@ export class Room extends Emitter {
       case 'text':
         if (msg.item) this.#acceptText(msg.item);
         return;
+      case 'text-delete': {
+        const item = this.texts.find((t) => t.id === msg.id);
+        if (item) this.#dropText(item);
+        return;
+      }
       case 'bye':
         // The host closed or reloaded its page. A reload comes back within seconds, so
         // wait briefly instead of the full window used for network trouble.

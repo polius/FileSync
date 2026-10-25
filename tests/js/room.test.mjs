@@ -374,6 +374,42 @@ test('messages go to everyone with the real sender name', async () => {
   assert.equal(b.texts[0].body, 'https://example.com/doc');
 });
 
+test('you can delete your own messages for everyone, including later joiners, but no one else\'s', async () => {
+  const { make, hub } = setup();
+  const host = make({ role: 'host', name: 'Hana' });
+  await joined(host);
+  const a = make({ role: 'guest', name: 'Ann' });
+  const b = make({ role: 'guest', name: 'Bob' });
+  await joined(a);
+  await joined(b);
+  a.sendText('my password is hunter2');
+  a.sendText('keep this one');
+  host.sendText('from the host');
+  await until(() => b.texts.length === 3 && a.texts.length === 3);
+  const [secret, keep, fromHost] = ['my password is hunter2', 'keep this one', 'from the host'].map((body) => a.texts.find((t) => t.body === body));
+
+  // Not yours: refused locally, and the host ignores a forged request.
+  assert.equal(a.deleteText(fromHost.id), false);
+  const bToHost = hub.nets.get(b.me.id).link(ROOM);
+  bToHost.send({ t: 'text-delete', id: secret.id });
+  bToHost.send({ t: 'text', id: keep.id, body: 'reusing an existing id' });
+  await tick(30);
+  assert.equal(host.texts.length, 3, 'a forged delete and a duplicate id change nothing');
+  assert.equal(host.texts.find((t) => t.id === keep.id).body, 'keep this one');
+
+  // Yours: gone for everyone, and for someone who joins afterwards.
+  assert.equal(a.deleteText(secret.id), true);
+  await until(() => host.texts.length === 2 && a.texts.length === 2 && b.texts.length === 2);
+  assert.equal(b.texts.some((t) => t.id === secret.id), false);
+  const c = make({ role: 'guest', name: 'Cid' });
+  await joined(c);
+  assert.deepEqual(c.texts.map((t) => t.body).sort(), ['from the host', 'keep this one']);
+
+  // The host deletes its own the same way.
+  assert.equal(host.deleteText(fromHost.id), true);
+  await until(() => a.texts.length === 1 && b.texts.length === 1 && c.texts.length === 1);
+});
+
 test('a guest reconnecting re-announces its files; a host reload keeps guests in the room', async () => {
   const { make, hub } = setup();
   const verifier = await derivePasswordKey('pw', ROOM);

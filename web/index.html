@@ -6,8 +6,8 @@
   <title>FileSync · Send files to any device</title>
   <meta name="description" content="Send files from one device to many, directly and privately, with no size limit and no accounts.">
   <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#111418" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#212529" media="(prefers-color-scheme: dark)">
   <meta property="og:title" content="FileSync">
   <meta property="og:description" content="Send files from one device to many, directly and privately.">
   <meta property="og:type" content="website">
@@ -15,7 +15,7 @@
   <link rel="icon" type="image/png" href="/assets/icon.png?v=__APP_VERSION__">
   <link rel="apple-touch-icon" href="/assets/icon.png?v=__APP_VERSION__">
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="preload" href="/assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/assets/fonts/public-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/css/app.css?v=__APP_VERSION__">
   <link rel="modulepreload" href="/js/app/main.js">
   <link rel="modulepreload" href="/js/app/room.js">
@@ -32,264 +32,278 @@
 </head>
 <body>
   <svg class="sprite" aria-hidden="true" focusable="false">
-    <symbol id="i-logo" viewBox="0 0 24 24"><path d="M2.5 9.5a14 14 0 0 1 19 0M5.5 12.8a9.5 9.5 0 0 1 13 0M8.6 16a5 5 0 0 1 6.8 0"/><circle cx="12" cy="19.2" r="1.3" class="fill"/></symbol>
-    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
-    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.4l2 2.2h8.6A1.5 1.5 0 0 1 21 9.7v8.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></symbol>
-    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></symbol>
-    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/></symbol>
-    <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3.5v11M8 7.5l4-4 4 4M6 11H5a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 5 20h14a1.5 1.5 0 0 0 1.5-1.5v-6A1.5 1.5 0 0 0 19 11h-1"/></symbol>
-    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
-    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
-    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></symbol>
-    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.5l7 2.6v5.4c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6.1z"/><path d="M8.8 12l2.2 2.2 4.2-4.4"/></symbol>
-    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4l9 15.5H3z"/><path d="M12 10v4.2M12 17v.01"/></symbol>
-    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 8v.01"/></symbol>
-    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 19.5a7 7 0 0 1 14 0"/></symbol>
-    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 4.2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 16.6l-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z"/></symbol>
-    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></symbol>
-    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z"/></symbol>
-    <symbol id="i-auto" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" class="fill"/></symbol>
-    <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12l16-7.5L13.5 20l-2.3-6.2z"/><path d="M11.2 13.8L20 4.5"/></symbol>
-    <symbol id="i-retry" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4h-4"/></symbol>
-    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z"/></symbol>
-    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="1.5"/></symbol>
-    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l.8 12.5h9.4L17.5 7"/></symbol>
-    <symbol id="i-qr" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2.5v2.5H14zM17.5 17.5H20V20h-2.5zM17.5 14H20M14 20h1"/></symbol>
-    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M15 5.5l3.5 3.5L9 18.5H5.5V15z"/></symbol>
-    <symbol id="i-message" viewBox="0 0 24 24"><path d="M5 5h14a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 17h-8l-4.5 3.5V17H5a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 5 5z"/></symbol>
-    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4.5h5.5V10M19.5 4.5L11 13M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/></symbol>
-    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></symbol>
+    <symbol id="i-wifi" viewBox="0 0 16 16"><path d="M15.384 6.115a.485.485 0 0 0-.047-.736A12.44 12.44 0 0 0 8 3C5.259 3 2.723 3.882.663 5.379a.485.485 0 0 0-.048.736.52.52 0 0 0 .668.05A11.45 11.45 0 0 1 8 4c2.507 0 4.827.802 6.716 2.164.205.148.49.13.668-.049"/> <path d="M13.229 8.271a.482.482 0 0 0-.063-.745A9.46 9.46 0 0 0 8 6c-1.905 0-3.68.56-5.166 1.526a.48.48 0 0 0-.063.745.525.525 0 0 0 .652.065A8.46 8.46 0 0 1 8 7a8.46 8.46 0 0 1 4.576 1.336c.206.132.48.108.653-.065m-2.183 2.183c.226-.226.185-.605-.1-.75A6.5 6.5 0 0 0 8 9c-1.06 0-2.062.254-2.946.704-.285.145-.326.524-.1.75l.015.015c.16.16.407.19.611.09A5.5 5.5 0 0 1 8 10c.868 0 1.69.201 2.42.56.203.1.45.07.61-.091zM9.06 12.44c.196-.196.198-.52-.04-.66A2 2 0 0 0 8 11.5a2 2 0 0 0-1.02.28c-.238.14-.236.464-.04.66l.706.706a.5.5 0 0 0 .707 0l.707-.707z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4"/></symbol>
+    <symbol id="i-folder2-open" viewBox="0 0 16 16"><path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h2.764c.958 0 1.76.56 2.311 1.184C7.985 3.648 8.48 4 9 4h4.5A1.5 1.5 0 0 1 15 5.5v.64c.57.265.94.876.856 1.546l-.64 5.124A2.5 2.5 0 0 1 12.733 15H3.266a2.5 2.5 0 0 1-2.481-2.19l-.64-5.124A1.5 1.5 0 0 1 1 6.14zM2 6h12v-.5a.5.5 0 0 0-.5-.5H9c-.964 0-1.71-.629-2.174-1.154C6.374 3.334 5.82 3 5.264 3H2.5a.5.5 0 0 0-.5.5zm-.367 1a.5.5 0 0 0-.496.562l.64 5.124A1.5 1.5 0 0 0 3.266 14h9.468a1.5 1.5 0 0 0 1.489-1.314l.64-5.124A.5.5 0 0 0 14.367 7z"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h1v1a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1v1z"/></symbol>
+    <symbol id="i-check-lg" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425z"/></symbol>
+    <symbol id="i-box-arrow-up" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M3.5 6a.5.5 0 0 0-.5.5v8a.5.5 0 0 0 .5.5h9a.5.5 0 0 0 .5-.5v-8a.5.5 0 0 0-.5-.5h-2a.5.5 0 0 1 0-1h2A1.5 1.5 0 0 1 14 6.5v8a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 14.5v-8A1.5 1.5 0 0 1 3.5 5h2a.5.5 0 0 1 0 1z"/> <path fill-rule="evenodd" d="M7.646.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 1.707V10.5a.5.5 0 0 1-1 0V1.707L5.354 3.854a.5.5 0 1 1-.708-.708z"/></symbol>
+    <symbol id="i-qr-code" viewBox="0 0 16 16"><path d="M2 2h2v2H2z"/> <path d="M6 0v6H0V0zM5 1H1v4h4zM4 12H2v2h2z"/> <path d="M6 10v6H0v-6zm-5 1v4h4v-4zm11-9h2v2h-2z"/> <path d="M10 0v6h6V0zm5 1v4h-4V1zM8 1V0h1v2H8v2H7V1zm0 5V4h1v2zM6 8V7h1V6h1v2h1V7h5v1h-4v1H7V8zm0 0v1H2V8H1v1H0V7h3v1zm10 1h-1V7h1zm-1 0h-1v2h2v-1h-1zm-4 0h2v1h-1v1h-1zm2 3v-1h-1v1h-1v1H9v1h3v-2zm0 0h3v1h-2v1h-1zm-4-1v1h1v-2H7v1z"/> <path d="M7 12h1v3h4v1H7zm9 2v2h-3v-1h2v-1z"/></symbol>
+    <symbol id="i-shield-shaded" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 14.933a1 1 0 0 0 .1-.025q.114-.034.294-.118c.24-.113.547-.29.893-.533a10.7 10.7 0 0 0 2.287-2.233c1.527-1.997 2.807-5.031 2.253-9.188a.48.48 0 0 0-.328-.39c-.651-.213-1.75-.56-2.837-.855C9.552 1.29 8.531 1.067 8 1.067zM5.072.56C6.157.265 7.31 0 8 0s1.843.265 2.928.56c1.11.3 2.229.655 2.887.87a1.54 1.54 0 0 1 1.044 1.262c.596 4.477-.787 7.795-2.465 9.99a11.8 11.8 0 0 1-2.517 2.453 7 7 0 0 1-1.048.625c-.28.132-.581.24-.829.24s-.548-.108-.829-.24a7 7 0 0 1-1.048-.625 11.8 11.8 0 0 1-2.517-2.453C1.928 10.487.545 7.169 1.141 2.692A1.54 1.54 0 0 1 2.185 1.43 63 63 0 0 1 5.072.56"/></symbol>
+    <symbol id="i-lock-fill" viewBox="0 0 16 16"><path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2m3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2"/></symbol>
+    <symbol id="i-shield-fill-check" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 0c-.69 0-1.843.265-2.928.56-1.11.3-2.229.655-2.887.87a1.54 1.54 0 0 0-1.044 1.262c-.596 4.477.787 7.795 2.465 9.99a11.8 11.8 0 0 0 2.517 2.453c.386.273.744.482 1.048.625.28.132.581.24.829.24s.548-.108.829-.24a7 7 0 0 0 1.048-.625 11.8 11.8 0 0 0 2.517-2.453c1.678-2.195 3.061-5.513 2.465-9.99a1.54 1.54 0 0 0-1.044-1.263 63 63 0 0 0-2.887-.87C9.843.266 8.69 0 8 0m2.146 5.146a.5.5 0 0 1 .708.708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7.5 7.793z"/></symbol>
+    <symbol id="i-info-circle" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/> <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/></symbol>
+    <symbol id="i-lightning-charge-fill" viewBox="0 0 16 16"><path d="M11.251.068a.5.5 0 0 1 .227.58L9.677 6.5H13a.5.5 0 0 1 .364.843l-8 8.5a.5.5 0 0 1-.842-.49L6.323 9.5H3a.5.5 0 0 1-.364-.843l8-8.5a.5.5 0 0 1 .615-.09z"/></symbol>
+    <symbol id="i-star-fill" viewBox="0 0 16 16"><path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.522 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187l-4.389 2.256z"/></symbol>
+    <symbol id="i-person-circle" viewBox="0 0 16 16"><path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0"/> <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8m8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1"/></symbol>
+    <symbol id="i-cloud-arrow-down-fill" viewBox="0 0 16 16"><path d="M8 2a5.53 5.53 0 0 0-3.594 1.342c-.766.66-1.321 1.52-1.464 2.383C1.266 6.095 0 7.555 0 9.318 0 11.366 1.708 13 3.781 13h8.906C14.502 13 16 11.57 16 9.773c0-1.636-1.242-2.969-2.834-3.194C12.923 3.999 10.69 2 8 2m2.354 6.854-2 2a.5.5 0 0 1-.708 0l-2-2a.5.5 0 1 1 .708-.708L7.5 9.293V5.5a.5.5 0 0 1 1 0v3.793l1.146-1.147a.5.5 0 0 1 .708.708"/></symbol>
+    <symbol id="i-arrow-down-short" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 4a.5.5 0 0 1 .5.5v5.793l2.146-2.147a.5.5 0 0 1 .708.708l-3 3a.5.5 0 0 1-.708 0l-3-3a.5.5 0 1 1 .708-.708L7.5 10.293V4.5A.5.5 0 0 1 8 4"/></symbol>
+    <symbol id="i-arrow-up-short" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 12a.5.5 0 0 0 .5-.5V5.707l2.146 2.147a.5.5 0 0 0 .708-.708l-3-3a.5.5 0 0 0-.708 0l-3 3a.5.5 0 1 0 .708.708L7.5 5.707V11.5a.5.5 0 0 0 .5.5"/></symbol>
+    <symbol id="i-arrow-down-circle" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1 8a7 7 0 1 0 14 0A7 7 0 0 0 1 8m15 0A8 8 0 1 1 0 8a8 8 0 0 1 16 0M8.5 4.5a.5.5 0 0 0-1 0v5.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293z"/></symbol>
+    <symbol id="i-x-circle" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/> <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708"/></symbol>
+    <symbol id="i-play-circle" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/> <path d="M6.271 5.055a.5.5 0 0 1 .52.038l3.5 2.5a.5.5 0 0 1 0 .814l-3.5 2.5A.5.5 0 0 1 6 10.5v-5a.5.5 0 0 1 .271-.445"/></symbol>
+    <symbol id="i-arrow-clockwise" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/> <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/></symbol>
+    <symbol id="i-check-circle-fill" viewBox="0 0 16 16"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0m-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></symbol>
+    <symbol id="i-x-circle-fill" viewBox="0 0 16 16"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293z"/></symbol>
+    <symbol id="i-exclamation-circle-fill" viewBox="0 0 16 16"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M8 4a.905.905 0 0 0-.9.995l.35 3.507a.552.552 0 0 0 1.1 0l.35-3.507A.905.905 0 0 0 8 4m.002 6a1 1 0 1 0 0 2 1 1 0 0 0 0-2"/></symbol>
+    <symbol id="i-exclamation-triangle-fill" viewBox="0 0 16 16"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5m.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/></symbol>
+    <symbol id="i-eye-fill" viewBox="0 0 16 16"><path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0"/> <path d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8m8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7"/></symbol>
+    <symbol id="i-eye-slash-fill" viewBox="0 0 16 16"><path d="m10.79 12.912-1.614-1.615a3.5 3.5 0 0 1-4.474-4.474l-2.06-2.06C.938 6.278 0 8 0 8s3 5.5 8 5.5a7 7 0 0 0 2.79-.588M5.21 3.088A7 7 0 0 1 8 2.5c5 0 8 5.5 8 5.5s-.939 1.721-2.641 3.238l-2.062-2.062a3.5 3.5 0 0 0-4.474-4.474z"/> <path d="M5.525 7.646a2.5 2.5 0 0 0 2.829 2.829zm4.95.708-2.829-2.83a2.5 2.5 0 0 1 2.829 2.829zm3.171 6-12-12 .708-.708 12 12z"/></symbol>
+    <symbol id="i-chat-left-text" viewBox="0 0 16 16"><path d="M14 1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.414A2 2 0 0 0 3 11.586l-2 2V2a1 1 0 0 1 1-1zM2 0a2 2 0 0 0-2 2v12.793a.5.5 0 0 0 .854.353l2.853-2.853A1 1 0 0 1 4.414 12H14a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z"/> <path d="M3 3.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5M3 6a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9A.5.5 0 0 1 3 6m0 2.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5"/></symbol>
+    <symbol id="i-box-arrow-up-right" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5"/> <path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0z"/></symbol>
+    <symbol id="i-info-circle-fill" viewBox="0 0 16 16"><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2"/></symbol>
+    <symbol id="i-x-lg" viewBox="0 0 16 16"><path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 16 16"><path d="M8.235 1.559a.5.5 0 0 0-.47 0l-7.5 4a.5.5 0 0 0 0 .882L3.188 8 .264 9.559a.5.5 0 0 0 0 .882l7.5 4a.5.5 0 0 0 .47 0l7.5-4a.5.5 0 0 0 0-.882L12.813 8l2.922-1.559a.5.5 0 0 0 0-.882zm3.515 7.008L14.438 10 8 13.433 1.562 10 4.25 8.567l3.515 1.874a.5.5 0 0 0 .47 0zM8 9.433 1.562 6 8 2.567 14.438 6z"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708"/></symbol>
+    <symbol id="i-trash3" viewBox="0 0 16 16"><path d="M6.5 1h3a.5.5 0 0 1 .5.5v1H6v-1a.5.5 0 0 1 .5-.5M11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3A1.5 1.5 0 0 0 5 1.5v1H1.5a.5.5 0 0 0 0 1h.538l.853 10.66A2 2 0 0 0 4.885 16h6.23a2 2 0 0 0 1.994-1.84l.853-10.66h.538a.5.5 0 0 0 0-1zm1.958 1-.846 10.58a1 1 0 0 1-.997.92h-6.23a1 1 0 0 1-.997-.92L3.042 3.5zm-7.487 1a.5.5 0 0 1 .528.47l.5 8.5a.5.5 0 0 1-.998.06L5 5.03a.5.5 0 0 1 .47-.53Zm5.058 0a.5.5 0 0 1 .47.53l-.5 8.5a.5.5 0 1 1-.998-.06l.5-8.5a.5.5 0 0 1 .528-.47M8 4.5a.5.5 0 0 1 .5.5v8.5a.5.5 0 0 1-1 0V5a.5.5 0 0 1 .5-.5"/></symbol>
+    <symbol id="i-box-arrow-right" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M10 12.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v2a.5.5 0 0 0 1 0v-2A1.5 1.5 0 0 0 9.5 2h-8A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-2a.5.5 0 0 0-1 0z"/> <path fill-rule="evenodd" d="M15.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708.708L14.293 7.5H5.5a.5.5 0 0 0 0 1h8.793l-2.147 2.146a.5.5 0 0 0 .708.708z"/></symbol>
   </svg>
 
   <a class="skip" href="#main">Skip to content</a>
 
-  <header class="topbar">
-    <a class="brand" href="/" id="brand" aria-label="FileSync home">
-      <span class="brand-mark"><svg class="icon"><use href="#i-logo"/></svg></span>
-      <span class="brand-name">FileSync</span>
-      <span class="version" id="version" hidden></span>
-    </a>
-    <nav class="topnav" aria-label="App">
-      <button type="button" class="btn ghost" id="theme-btn"><svg class="icon"><use href="#i-auto" id="theme-icon"/></svg><span id="theme-label">Auto</span></button>
-      <button type="button" class="btn ghost" id="about-btn" aria-label="About"><svg class="icon"><use href="#i-info"/></svg><span>About</span></button>
-      <button type="button" class="btn ghost" id="new-room-btn" aria-label="New room"><svg class="icon"><use href="#i-plus"/></svg><span>New room</span></button>
-    </nav>
-  </header>
-
-  <div class="banners">
-    <div class="banner warn" id="insecure-banner" hidden>
-      <svg class="icon"><use href="#i-alert"/></svg>
-      <p>This server uses plain HTTP, so large files are held in memory while they download. For large files, set up FileSync with HTTPS: see the <a href="https://github.com/polius/filesync#option-b--https-own-domain-recommended" target="_blank" rel="noopener">HTTPS guide</a>.</p>
-      <button type="button" class="btn icon-only ghost" id="insecure-close" aria-label="Dismiss"><svg class="icon"><use href="#i-x"/></svg></button>
-    </div>
-    <div class="banner info" id="conn-banner" role="status" hidden>
-      <span class="spinner" aria-hidden="true"></span>
-      <p id="conn-banner-text">Reconnecting…</p>
-    </div>
-  </div>
+  <nav class="topnav" aria-label="App">
+    <button type="button" class="nav-link" id="theme-btn"><span id="theme-label">Auto</span></button>
+    <span class="sep" aria-hidden="true">|</span>
+    <button type="button" class="nav-link" id="about-btn" aria-controls="about-panel" aria-expanded="false">About</button>
+  </nav>
 
   <main id="main" class="page">
-    <noscript><section class="card panel"><h1>FileSync needs JavaScript</h1><p>Turn on JavaScript to send and receive files.</p></section></noscript>
+    <header class="hero">
+      <a class="brand" href="/" id="brand" title="Start a new room">
+        <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-wifi"/></svg></span>
+        <span class="brand-name">FileSync</span>
+        <span class="version" id="version" hidden></span>
+      </a>
+      <p class="tagline">Send files from one device to many in real time.</p>
+    </header>
+
+    <div class="banners">
+      <div class="banner warn" id="insecure-banner" hidden>
+        <svg class="icon"><use href="#i-exclamation-triangle-fill"/></svg>
+        <p>This server uses plain HTTP, so large files are held in memory while they download. For large files, set up FileSync with HTTPS: see the <a href="https://github.com/polius/filesync#option-b--https-own-domain-recommended" target="_blank" rel="noopener">HTTPS guide</a>.</p>
+        <button type="button" class="icon-btn" id="insecure-close" aria-label="Dismiss"><svg class="icon"><use href="#i-x-lg"/></svg></button>
+      </div>
+      <div class="banner info" id="conn-banner" role="status" hidden>
+        <span class="spinner" aria-hidden="true"></span>
+        <p id="conn-banner-text">Reconnecting…</p>
+      </div>
+    </div>
+
+    <noscript><section class="box panel"><p class="panel-title">FileSync needs JavaScript</p><p>Turn on JavaScript to send and receive files.</p></section></noscript>
+
+    <!-- About (replaces the page content while open, like v1) -->
+    <section class="box panel about" id="about-panel" hidden aria-labelledby="about-title">
+      <h1 class="about-title" id="about-title">About</h1>
+      <p class="about-lead">Designed to work on any device, anywhere.</p>
+      <hr>
+      <p>FileSync sends files from one device to many in real time. Open a room, share the link or QR code, and anyone who joins can send and receive files. No accounts, no installs, and no size limit.</p>
+      <h2 class="about-sub"><svg class="icon"><use href="#i-layers"/></svg>Under the hood</h2>
+      <p>Files travel directly between browsers over <a href="https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API" target="_blank" rel="noopener">WebRTC</a>, encrypted in transit. The server only helps devices find each other. When a direct path isn’t possible, an encrypted relay passes the data along without being able to read it.</p>
+      <p>Links shared from the room include a security key after the <code>#</code>. Browsers never send that part to any server. When you join with it, FileSync confirms that nobody, not even the server, is sitting between you and the host, and shows <strong>Verified</strong>. A room code typed by hand still works, without that check.</p>
+      <p>Every file is checked with SHA-256 when it arrives, and interrupted transfers continue from where they stopped.</p>
+      <figure class="comic">
+        <img id="comic" src="/assets/comic.png?v=__APP_VERSION__" width="456" height="616" loading="lazy" alt="xkcd comic: sending a file in 2011 still means emailing, FTP or a USB stick, and early adopters are still figuring it out.">
+        <figcaption><a href="https://xkcd.com/949" target="_blank" rel="noopener">“File Transfer”</a> by Randall Munroe, xkcd, <a href="https://creativecommons.org/licenses/by-nc/2.5/" target="_blank" rel="noopener">CC BY-NC 2.5</a>.</figcaption>
+      </figure>
+      <p>Released under the MIT License. <a href="https://github.com/polius/filesync" target="_blank" rel="noopener">github.com/polius/filesync</a> · <a href="/test.html">Check my connection</a></p>
+    </section>
 
     <!-- Joining a room -->
-    <section class="card panel center" id="joining" hidden aria-live="polite">
-      <span class="spinner large" aria-hidden="true"></span>
-      <h1 class="panel-title">Joining the room…</h1>
+    <section class="box panel" id="joining" hidden aria-live="polite">
+      <p class="status"><span class="spinner" aria-hidden="true"></span><span>Connecting…</span></p>
       <p class="muted" id="joining-detail">Connecting directly to the person who shared the link.</p>
     </section>
 
     <!-- Password -->
-    <section class="card panel" id="password-panel" hidden>
+    <section class="box panel narrow" id="password-panel" hidden>
       <form id="password-form" class="stack" novalidate>
-        <div class="panel-head">
-          <span class="panel-icon"><svg class="icon"><use href="#i-lock"/></svg></span>
-          <div>
-            <h1 class="panel-title">This room has a password</h1>
-            <p class="muted">Ask the person who shared the link for it.</p>
-          </div>
+        <h1 class="panel-title"><svg class="icon success-text"><use href="#i-shield-shaded"/></svg>This room is protected with a password</h1>
+        <p class="muted">Ask the person who shared the link for it.</p>
+        <label class="visually-hidden" for="password-input">Password</label>
+        <div class="input-group">
+          <input type="password" id="password-input" placeholder="Enter the password" autocomplete="current-password" required>
+          <button type="button" class="addon" id="password-reveal" aria-pressed="false" aria-label="Show password"><svg class="icon"><use href="#i-eye-fill"/></svg></button>
         </div>
-        <label class="field">
-          <span class="label">Password</span>
-          <span class="input-row">
-            <input type="password" id="password-input" autocomplete="current-password" required>
-            <button type="button" class="btn ghost" id="password-reveal" aria-pressed="false">Show</button>
-          </span>
-        </label>
         <p class="field-error" id="password-error" role="alert" hidden></p>
         <button type="submit" class="btn primary block" id="password-submit"><span class="spinner" aria-hidden="true" hidden id="password-spinner"></span><span>Join room</span></button>
       </form>
     </section>
 
     <!-- Error -->
-    <section class="card panel" id="error-panel" hidden>
-      <div class="panel-head">
-        <span class="panel-icon danger"><svg class="icon"><use href="#i-alert"/></svg></span>
-        <div>
-          <h1 class="panel-title" id="error-title"></h1>
-          <p class="muted" id="error-detail"></p>
-        </div>
-      </div>
+    <section class="box panel" id="error-panel" hidden>
+      <h1 class="panel-title danger-text"><svg class="icon"><use href="#i-exclamation-circle-fill"/></svg><span id="error-title"></span></h1>
+      <p class="muted" id="error-detail"></p>
       <div class="actions">
-        <button type="button" class="btn primary" id="error-retry"><svg class="icon"><use href="#i-retry"/></svg><span>Try again</span></button>
-        <a class="btn" href="/"><svg class="icon"><use href="#i-plus"/></svg><span>Start a new room</span></a>
-        <a class="btn ghost" href="/test.html">Check my connection</a>
+        <button type="button" class="pill-btn primary" id="error-retry"><svg class="icon"><use href="#i-arrow-clockwise"/></svg><span>Try again</span></button>
+        <a class="pill-btn secondary" href="/"><svg class="icon big"><use href="#i-plus"/></svg><span>Start a new room</span></a>
+        <a class="text-link" href="/test.html">Check my connection</a>
       </div>
     </section>
 
     <!-- The room -->
     <div class="room" id="room" hidden>
-      <section class="card share" aria-labelledby="share-title">
+      <section class="box share" aria-labelledby="share-title">
         <details class="qr-box" id="qr-box">
-          <summary class="btn ghost qr-toggle"><svg class="icon"><use href="#i-qr"/></svg><span>QR code</span><svg class="icon chev"><use href="#i-chevron"/></svg></summary>
-          <div class="qr-tile"><canvas id="qr" width="232" height="232" role="img" aria-label="QR code for the room link"></canvas></div>
+          <summary class="text-link qr-toggle"><svg class="icon"><use href="#i-qr-code"/></svg><span>QR code</span><svg class="icon chev"><use href="#i-chevron-down"/></svg></summary>
+          <canvas id="qr" width="185" height="185" role="img" aria-label="QR code for the room link"></canvas>
         </details>
         <div class="share-main">
-          <p class="status" id="status" role="status"><span class="dot" id="status-dot"></span><span id="status-text">Starting…</span></p>
-          <h1 class="share-title" id="share-title">Share this link with the devices you want to send files to</h1>
-          <div class="link-row">
+          <div class="status-row">
+            <p class="status" id="status" role="status"><span class="dot" id="status-dot"><svg class="icon"><use href="#i-lightning-charge-fill"/></svg></span><span id="status-text">Starting…</span></p>
+            <p class="pill" id="verify-badge" hidden></p>
+            <p class="pill ok" id="password-badge" hidden><svg class="icon"><use href="#i-lock-fill"/></svg><span>Password</span></p>
+          </div>
+          <h1 class="share-title" id="share-title">Share the room link with the devices you want to send files to.</h1>
+          <div class="input-group link-group">
             <label class="visually-hidden" for="share-link">Room link</label>
             <input id="share-link" class="link-field" type="text" readonly spellcheck="false">
-            <button type="button" class="btn" id="copy-btn"><svg class="icon"><use href="#i-copy" id="copy-icon"/></svg><span id="copy-label">Copy</span></button>
-            <button type="button" class="btn" id="share-btn" hidden><svg class="icon"><use href="#i-share"/></svg><span>Share</span></button>
+            <button type="button" class="addon" id="copy-btn" title="Copy link"><svg class="icon"><use href="#i-copy" id="copy-icon"/></svg><span class="visually-hidden" id="copy-label">Copy</span></button>
+            <button type="button" class="addon" id="share-btn" title="Share link" hidden><svg class="icon"><use href="#i-box-arrow-up"/></svg><span class="visually-hidden">Share</span></button>
           </div>
-          <div class="share-meta">
-            <p class="badge" id="verify-badge" hidden></p>
-            <p class="badge" id="password-badge" hidden><svg class="icon"><use href="#i-lock"/></svg><span>Password protected</span></p>
-            <button type="button" class="btn link-btn" id="password-btn" hidden>Add a password</button>
+          <div class="send-actions">
+            <button type="button" class="pill-btn primary" id="send-files-btn"><svg class="icon big"><use href="#i-plus"/></svg><span>Send Files</span></button>
+            <button type="button" class="pill-btn success" id="password-btn" hidden><svg class="icon"><use href="#i-shield-shaded"/></svg><span id="password-btn-label">Add password</span></button>
+            <button type="button" class="pill-btn brand" id="messages-btn" aria-haspopup="dialog"><svg class="icon"><use href="#i-chat-left-text"/></svg><span>Messages</span><span class="badge" id="messages-badge" aria-hidden="true" hidden></span></button>
+            <input type="file" id="file-input" multiple hidden>
+            <input type="file" id="folder-input" webkitdirectory multiple hidden>
           </div>
+          <p class="hint">Or <button type="button" class="inline-link" id="send-folder-btn">send a folder</button>. You can also drop or paste files anywhere on this page.</p>
         </div>
-      </section>
-
-      <section class="card send" aria-label="Send">
-        <div class="send-actions">
-          <button type="button" class="btn primary big" id="send-files-btn"><svg class="icon"><use href="#i-plus"/></svg><span>Send files</span></button>
-          <button type="button" class="btn big" id="send-folder-btn"><svg class="icon"><use href="#i-folder"/></svg><span>Send a folder</span></button>
-          <input type="file" id="file-input" multiple hidden>
-          <input type="file" id="folder-input" webkitdirectory multiple hidden>
-        </div>
-        <p class="hint muted">Or drop files anywhere on this page, or paste them.</p>
       </section>
 
       <section class="card" aria-labelledby="people-title">
-        <header class="card-head">
+        <header class="card-header">
+          <span class="side" aria-hidden="true"></span>
           <h2 id="people-title">People <span class="count" id="people-count"></span></h2>
-          <button type="button" class="btn ghost small" id="rename-btn"><svg class="icon"><use href="#i-pencil"/></svg><span>Change my name</span></button>
+          <span class="side end" aria-hidden="true"></span>
         </header>
-        <ul class="people" id="people"></ul>
-        <p class="empty muted" id="people-empty">Nobody else is here yet. When someone opens the link, they’ll appear here.</p>
+        <ul class="list people" id="people"></ul>
       </section>
 
       <section class="card" aria-labelledby="files-title">
-        <header class="card-head">
+        <header class="card-header">
+          <span class="side" aria-hidden="true"></span>
           <h2 id="files-title">Files <span class="count" id="files-count"></span></h2>
-          <button type="button" class="btn small" id="download-all-btn" hidden><svg class="icon"><use href="#i-download"/></svg><span id="download-all-label">Download all</span></button>
+          <span class="side end"><button type="button" class="header-action" id="download-all-btn" hidden><svg class="icon"><use href="#i-cloud-arrow-down-fill"/></svg><span id="download-all-label">Download all</span></button></span>
         </header>
         <div class="bundle" id="bundle" hidden>
           <div class="bundle-text">
             <p class="bundle-title" id="bundle-title"></p>
-            <p class="muted small-text" id="bundle-detail"></p>
+            <p class="muted" id="bundle-detail"></p>
           </div>
+          <button type="button" class="btn secondary small" id="bundle-action">Cancel</button>
           <div class="bar" id="bundle-bar"><span></span></div>
-          <button type="button" class="btn small" id="bundle-action">Cancel</button>
         </div>
-        <ul class="files" id="files"></ul>
-        <p class="empty muted" id="files-empty">No files yet. Files you send, and files others send, show up here.</p>
+        <ul class="list files" id="files"></ul>
+        <p class="list-empty" id="files-empty">No files transferred</p>
       </section>
 
-      <section class="card" aria-labelledby="texts-title">
-        <header class="card-head">
-          <h2 id="texts-title">Messages <span class="count" id="texts-count"></span></h2>
-        </header>
-        <form class="composer" id="text-form">
-          <label class="visually-hidden" for="text-input">Message or link to send</label>
-          <textarea id="text-input" rows="2" maxlength="10000" placeholder="Send a link, a code or a note to everyone in the room"></textarea>
-          <button type="submit" class="btn primary" id="text-send"><svg class="icon"><use href="#i-send"/></svg><span>Send</span></button>
-        </form>
-        <ul class="texts" id="texts"></ul>
-      </section>
     </div>
+
+    <footer class="footer">
+      <p><svg class="icon"><use href="#i-lock-fill"/></svg>Files go straight between devices, encrypted in transit. Nothing is stored on the server.</p>
+    </footer>
   </main>
 
-  <footer class="footer">
-    <p><svg class="icon"><use href="#i-lock"/></svg> Files go straight between devices, encrypted in transit. Nothing is stored on the server.</p>
-  </footer>
-
   <div class="drop-overlay" id="drop-overlay" hidden>
-    <div class="drop-target"><svg class="icon"><use href="#i-download"/></svg><p>Drop to send to everyone in the room</p></div>
+    <div class="drop-target"><svg class="icon"><use href="#i-cloud-arrow-down-fill"/></svg><p>Drop to send to everyone in the room</p></div>
   </div>
 
   <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
 
-  <!-- Dialogs -->
-  <dialog id="about-dialog" class="dialog wide" aria-labelledby="about-title">
-    <form method="dialog" class="dialog-body">
+  <!-- Dialogs (v1 modal look) -->
+  <dialog id="rename-dialog" class="dialog" aria-labelledby="rename-title" aria-describedby="rename-sub">
+    <form method="dialog" id="rename-form">
       <header class="dialog-head">
-        <h2 id="about-title">About FileSync</h2>
-        <button class="btn icon-only ghost" value="close" aria-label="Close"><svg class="icon"><use href="#i-x"/></svg></button>
+        <span class="dialog-icon brand-text" aria-hidden="true"><svg class="icon"><use href="#i-person-circle"/></svg></span>
+        <div class="dialog-titles">
+          <h2 id="rename-title">Change name</h2>
+          <p class="dialog-sub" id="rename-sub">This is the name everyone in the room sees.</p>
+        </div>
+        <button type="button" class="icon-btn" data-close aria-label="Close"><svg class="icon"><use href="#i-x-lg"/></svg></button>
       </header>
-      <div class="prose">
-        <p>FileSync sends files from one device to many in real time. Open a room, share the link or QR code, and anyone who joins can send and receive files. No accounts, no installs, and no size limit.</p>
-        <h3>How it works</h3>
-        <p>Files travel directly between browsers over WebRTC, encrypted in transit. The server only helps devices find each other. When a direct path isn’t possible, an encrypted relay passes the data along without being able to read it.</p>
-        <p>Links shared from the room include a security key after the <code>#</code>. Browsers never send that part to any server. When you join with it, FileSync confirms that nobody, not even the server, is sitting between you and the host, and shows <strong>Verified</strong>. A room code typed by hand still works, without that check.</p>
-        <p>Every file is checked with SHA-256 when it arrives, and interrupted transfers continue from where they stopped.</p>
-        <figure class="comic">
-          <img id="comic" src="/assets/comic.png?v=__APP_VERSION__" width="456" height="616" loading="lazy" alt="xkcd comic: sending a file in 2011 still means emailing, FTP or a USB stick, and early adopters are still figuring it out.">
-          <figcaption><a href="https://xkcd.com/949" target="_blank" rel="noopener">“File Transfer”</a> by Randall Munroe, xkcd, <a href="https://creativecommons.org/licenses/by-nc/2.5/" target="_blank" rel="noopener">CC BY-NC 2.5</a>.</figcaption>
-        </figure>
-        <p class="muted">Open source under the MIT License. <a href="https://github.com/polius/filesync" target="_blank" rel="noopener">Source code on GitHub</a> · <a href="/test.html">Connection check</a></p>
-      </div>
-    </form>
-  </dialog>
-
-  <dialog id="rename-dialog" class="dialog" aria-labelledby="rename-title">
-    <form method="dialog" class="dialog-body" id="rename-form">
-      <header class="dialog-head">
-        <h2 id="rename-title">Change your name</h2>
-        <button class="btn icon-only ghost" value="cancel" formnovalidate aria-label="Close"><svg class="icon"><use href="#i-x"/></svg></button>
-      </header>
-      <label class="field">
-        <span class="label">Name others see</span>
+      <div class="dialog-body">
+        <label class="visually-hidden" for="rename-input">Your name</label>
         <input id="rename-input" type="text" maxlength="60" autocomplete="nickname" required>
-      </label>
-      <p class="field-error" id="rename-error" role="alert" hidden></p>
+        <p class="field-error" id="rename-error" role="alert" hidden></p>
+      </div>
       <footer class="dialog-foot">
-        <button class="btn" value="cancel" formnovalidate>Cancel</button>
+        <button type="button" class="btn secondary" data-close>Cancel</button>
         <button class="btn primary" value="ok" id="rename-ok">Save</button>
       </footer>
     </form>
   </dialog>
 
-  <dialog id="password-dialog" class="dialog" aria-labelledby="password-dialog-title">
-    <form method="dialog" class="dialog-body" id="set-password-form">
+  <dialog id="password-dialog" class="dialog" aria-labelledby="password-dialog-title" aria-describedby="password-dialog-sub">
+    <form method="dialog" id="set-password-form">
       <header class="dialog-head">
-        <h2 id="password-dialog-title">Room password</h2>
-        <button class="btn icon-only ghost" value="cancel" formnovalidate aria-label="Close"><svg class="icon"><use href="#i-x"/></svg></button>
+        <span class="dialog-icon success-text" aria-hidden="true"><svg class="icon"><use href="#i-shield-shaded"/></svg></span>
+        <div class="dialog-titles">
+          <h2 id="password-dialog-title">Room password</h2>
+          <p class="dialog-sub" id="password-dialog-sub">People who join after this need it. Anyone already here stays.</p>
+        </div>
+        <button type="button" class="icon-btn" data-close aria-label="Close"><svg class="icon"><use href="#i-x-lg"/></svg></button>
       </header>
-      <p class="muted">People who join after this need the password. Anyone already here stays.</p>
-      <label class="field">
-        <span class="label">Password</span>
-        <span class="input-row">
-          <input id="set-password-input" type="password" autocomplete="new-password" minlength="1">
-          <button type="button" class="btn ghost" id="set-password-reveal" aria-pressed="false">Show</button>
-        </span>
-      </label>
+      <div class="dialog-body">
+        <label class="visually-hidden" for="set-password-input">Password</label>
+        <div class="input-group">
+          <input id="set-password-input" type="password" placeholder="Enter a password" autocomplete="new-password" minlength="1">
+          <button type="button" class="addon" id="set-password-reveal" aria-pressed="false" aria-label="Show password"><svg class="icon"><use href="#i-eye-fill"/></svg></button>
+        </div>
+      </div>
       <footer class="dialog-foot">
-        <button class="btn danger-text" value="remove" id="password-remove" formnovalidate hidden>Remove password</button>
+        <button type="button" class="btn danger-link" data-close="remove" id="password-remove" hidden><svg class="icon"><use href="#i-trash3"/></svg><span>Remove password</span></button>
         <span class="spacer"></span>
-        <button class="btn" value="cancel" formnovalidate>Cancel</button>
+        <button type="button" class="btn secondary" data-close>Cancel</button>
         <button class="btn primary" value="ok">Save</button>
       </footer>
     </form>
   </dialog>
 
-  <dialog id="confirm-dialog" class="dialog" aria-labelledby="confirm-title">
-    <form method="dialog" class="dialog-body">
-      <header class="dialog-head"><h2 id="confirm-title"></h2></header>
-      <p class="muted" id="confirm-text"></p>
+  <dialog id="messages-dialog" class="dialog messages-dialog" aria-labelledby="messages-title" aria-describedby="messages-sub">
+    <header class="dialog-head">
+      <span class="dialog-icon brand-text" aria-hidden="true"><svg class="icon"><use href="#i-chat-left-text"/></svg></span>
+      <div class="dialog-titles">
+        <h2 id="messages-title">Messages <span class="count" id="texts-count"></span></h2>
+        <p class="dialog-sub" id="messages-sub">Everyone in the room sees what you send here.</p>
+      </div>
+      <form method="dialog"><button class="icon-btn" aria-label="Close"><svg class="icon"><use href="#i-x-lg"/></svg></button></form>
+    </header>
+    <div class="messages-body" id="messages-body">
+      <ul class="texts" id="texts"></ul>
+      <p class="texts-empty" id="texts-empty"><svg class="icon"><use href="#i-chat-left-text"/></svg><span>No messages yet. Send a note or a link to everyone here.</span></p>
+    </div>
+    <form class="composer" id="text-form">
+      <label class="visually-hidden" for="text-input">Message to everyone in the room</label>
+      <div class="input-group">
+        <textarea id="text-input" rows="1" maxlength="10000" placeholder="Write a message"></textarea>
+        <button type="submit" class="addon send" id="text-send" title="Send (Enter)">Send</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="confirm-dialog" class="dialog" aria-labelledby="confirm-title" aria-describedby="confirm-text">
+    <form method="dialog">
+      <header class="dialog-head">
+        <span class="dialog-icon danger-text" aria-hidden="true"><svg class="icon"><use href="#i-box-arrow-right"/></svg></span>
+        <div class="dialog-titles">
+          <h2 id="confirm-title"></h2>
+          <p class="dialog-sub" id="confirm-text"></p>
+        </div>
+      </header>
       <footer class="dialog-foot">
-        <button class="btn" value="cancel">Stay</button>
-        <button class="btn primary" value="ok" id="confirm-ok"></button>
+        <button class="btn secondary" value="cancel">Stay</button>
+        <button class="btn danger" value="ok" id="confirm-ok"></button>
       </footer>
     </form>
   </dialog>
@@ -297,31 +311,32 @@
   <!-- Row templates -->
   <template id="person-tpl">
     <li class="person">
-      <span class="avatar" aria-hidden="true"></span>
-      <span class="person-name"></span>
-      <span class="tag host-tag" hidden><svg class="icon"><use href="#i-star"/></svg>Host</span>
-      <span class="tag me-tag" hidden>You</span>
-      <span class="tag verified-tag" hidden><svg class="icon"><use href="#i-shield"/></svg>Verified</span>
+      <span class="side" aria-hidden="true"></span>
+      <span class="person-main">
+        <svg class="icon role"><use href="#i-lightning-charge-fill"/></svg>
+        <span class="person-name"></span>
+        <svg class="icon verified-tag success-text" hidden><title>Verified</title><use href="#i-shield-fill-check"/></svg>
+      </span>
+      <span class="side end"><button type="button" class="header-action rename" data-act="rename" hidden>Change name</button></span>
     </li>
   </template>
 
   <template id="file-tpl">
     <li class="file">
-      <span class="file-thumb" aria-hidden="true"><img alt="" hidden><span class="file-ext"></span></span>
+      <img class="file-thumb" alt="" hidden>
       <div class="file-main">
-        <p class="file-name"><span class="file-path"></span><span class="file-base"></span></p>
+        <p class="file-name"><svg class="icon state"><use href="#i-arrow-down-short"/></svg><span class="spinner" aria-hidden="true" hidden></span><span class="file-path"></span><span class="file-base"></span></p>
         <p class="file-meta"></p>
         <div class="bar" hidden><span></span></div>
         <p class="file-note" hidden></p>
         <details class="receivers" hidden><summary></summary><ul></ul></details>
       </div>
       <div class="file-actions">
-        <span class="done-mark" hidden><svg class="icon"><use href="#i-check"/></svg></span>
-        <button type="button" class="btn small" data-act="download" hidden><svg class="icon"><use href="#i-download"/></svg><span>Download</span></button>
-        <button type="button" class="btn small" data-act="resume" hidden><svg class="icon"><use href="#i-play"/></svg><span>Resume</span></button>
-        <button type="button" class="btn small" data-act="retry" hidden><svg class="icon"><use href="#i-retry"/></svg><span>Try again</span></button>
-        <button type="button" class="btn small" data-act="cancel" hidden><svg class="icon"><use href="#i-stop"/></svg><span>Stop</span></button>
-        <button type="button" class="btn small ghost" data-act="remove" hidden><svg class="icon"><use href="#i-trash"/></svg><span>Stop sharing</span></button>
+        <button type="button" class="round-btn" data-act="download" hidden><svg class="icon"><use href="#i-arrow-down-circle"/></svg><span class="visually-hidden">Download</span></button>
+        <button type="button" class="round-btn" data-act="resume" hidden><svg class="icon"><use href="#i-play-circle"/></svg><span class="visually-hidden">Resume</span></button>
+        <button type="button" class="round-btn" data-act="retry" hidden><svg class="icon"><use href="#i-arrow-clockwise"/></svg><span class="visually-hidden">Try again</span></button>
+        <button type="button" class="round-btn danger" data-act="cancel" hidden><svg class="icon"><use href="#i-x-circle"/></svg><span class="visually-hidden">Stop</span></button>
+        <button type="button" class="round-btn danger" data-act="remove" hidden><svg class="icon"><use href="#i-x-circle"/></svg><span class="visually-hidden">Stop sharing</span></button>
       </div>
     </li>
   </template>
@@ -329,10 +344,13 @@
   <template id="text-tpl">
     <li class="text">
       <p class="text-meta"><span class="text-from"></span> · <time></time></p>
-      <p class="text-body"></p>
-      <div class="text-actions">
-        <button type="button" class="btn small ghost" data-act="copy-text"><svg class="icon"><use href="#i-copy"/></svg><span>Copy</span></button>
-        <a class="btn small ghost" data-act="open" target="_blank" rel="noopener noreferrer" hidden><svg class="icon"><use href="#i-external"/></svg><span>Open link</span></a>
+      <div class="text-row">
+        <p class="text-body"></p>
+        <div class="text-actions">
+          <button type="button" class="round-btn muted-btn" data-act="copy-text"><svg class="icon"><use href="#i-copy"/></svg><span class="visually-hidden">Copy</span></button>
+          <a class="round-btn muted-btn" data-act="open" target="_blank" rel="noopener noreferrer" hidden><svg class="icon"><use href="#i-box-arrow-up-right"/></svg><span class="visually-hidden">Open link</span></a>
+          <button type="button" class="round-btn muted-btn delete" data-act="delete-text" title="Delete for everyone. People may have already seen it." hidden><svg class="icon"><use href="#i-trash3"/></svg><span class="visually-hidden">Delete for everyone</span></button>
+        </div>
       </div>
     </li>
   </template>

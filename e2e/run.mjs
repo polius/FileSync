@@ -164,7 +164,7 @@ async function runCell(cell, fixture) {
     const qs = `sink=${cell.sink}&ice=${cell.ice}`;
     await sender.goto(`${BASE_URL}/?${qs}`, { waitUntil: 'domcontentloaded', timeout: PAIR_TIMEOUT_MS });
     await sender.waitForSelector('#room', { state: 'visible', timeout: PAIR_TIMEOUT_MS });
-    const shareUrl = await sender.inputValue('#share-link', { timeout: PAIR_TIMEOUT_MS });
+    const shareUrl = await sender.getAttribute('#share-link', 'data-link', { timeout: PAIR_TIMEOUT_MS });
     if (!shareUrl) throw new Error('Sender never produced a share URL');
 
     // The share link carries the security key in its fragment; the query goes before it.

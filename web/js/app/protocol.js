@@ -115,6 +115,9 @@ const PARSERS = {
     const body = parseText(m.body);
     return isId(m.id) && body ? { id: m.id, body } : null;
   },
+  // Both ways: a guest asks the host to delete one of its own messages; the host then tells
+  // everyone. The host checks the requester sent it, so nobody deletes someone else's.
+  'text-delete': (m) => (isId(m.id) ? { id: m.id } : null),
 
   // host -> guest
   'auth-challenge': (m) => (typeof m.nonce === 'string' && NONCE_RE.test(m.nonce) ? { nonce: m.nonce, retry: m.retry === true } : null),
@@ -159,12 +162,12 @@ const TRANSFER = ['get', 'queued', 'cancel'];
 // the handshake is allowed.
 export function hostAccepts(type, admitted) {
   if (!admitted) return type === 'hello' || type === 'auth-proof' || type === 'bye';
-  return ['hello', 'rename', 'file-add', 'file-remove', 'file-thumb', 'text', 'bye', ...TRANSFER].includes(type);
+  return ['hello', 'rename', 'file-add', 'file-remove', 'file-thumb', 'text', 'text-delete', 'bye', ...TRANSFER].includes(type);
 }
 
 // A guest receiving from the host link: room state is authoritative only from here.
 export function guestAcceptsFromHost(type) {
-  return ['auth-challenge', 'auth-fail', 'welcome', 'members', 'catalog', 'text', 'bye', ...TRANSFER].includes(type);
+  return ['auth-challenge', 'auth-fail', 'welcome', 'members', 'catalog', 'text', 'text-delete', 'bye', ...TRANSFER].includes(type);
 }
 
 // A guest receiving from another guest: only transfer coordination, never room state.

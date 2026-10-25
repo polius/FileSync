@@ -10,22 +10,9 @@ import { local, session } from './storage.js';
 const $ = (id) => document.getElementById(id);
 const THEMES = ['auto', 'light', 'dark'];
 const THEME_LABEL = { auto: 'Auto', light: 'Light', dark: 'Dark' };
-const THEME_ICON = { auto: '#i-auto', light: '#i-sun', dark: '#i-moon' };
-const AVATAR_COLORS = ['#2f6fdf', '#0f8a6a', '#b4570d', '#8a3fd1', '#c2306b', '#0e7c99', '#5a6b0f', '#a8461d'];
 const URL_RE = /^https?:\/\/[^\s<>"']+$/i;
 
 function setIcon(useEl, href) { useEl.setAttribute('href', href); }
-
-function avatarColor(id) {
-  let h = 0;
-  for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return AVATAR_COLORS[h % AVATAR_COLORS.length];
-}
-
-function initials(name) {
-  const parts = name.trim().split(/\s+/);
-  return ((parts[0]?.[0] || '?') + (parts[1]?.[0] || '')).toUpperCase();
-}
 
 function ordinal(n) {
   const s = ['th', 'st', 'nd', 'rd'];
@@ -39,14 +26,22 @@ export class View {
   #frame = 0;
   #fileRows = new Map();
   #textRows = new Map();
+  #peopleKey = '';
   #lastShareUrl = '';
   #dragDepth = 0;
+  #about = false;
+  #seenTexts = new Set();
+  #wide = window.matchMedia('(min-width: 721px)');
 
   constructor(room, opts) {
     this.#room = room;
     this.#opts = opts;
     room.on('change', () => this.schedule());
-    room.on('toast', ({ text, kind }) => this.toast(text, kind));
+    room.on('toast', ({ text, kind }) => {
+      // The open Messages dialog already shows new messages.
+      if (kind === 'message' && $('messages-dialog').open) return;
+      this.toast(text, kind);
+    });
     this.#bind();
     this.#applyTheme(local.get('filesync.theme') || 'auto', false);
     if (!window.isSecureContext && !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) && !session.get('filesync.insecureDismissed')) {
@@ -68,17 +63,19 @@ export class View {
   toast(text, kind = 'info') {
     const box = $('toasts');
     const el = document.createElement('div');
-    el.className = `toast ${kind === 'error' ? 'error' : ''}`;
+    el.className = `toast ${kind}`;
     el.setAttribute('role', kind === 'error' ? 'alert' : 'status');
     const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     icon.setAttribute('class', 'icon');
     icon.setAttribute('aria-hidden', 'true');
     const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
-    use.setAttribute('href', kind === 'success' ? '#i-check' : kind === 'error' || kind === 'warn' ? '#i-alert' : '#i-info');
+    use.setAttribute('href', kind === 'success' ? '#i-check-circle-fill' : kind === 'error' || kind === 'warn' ? '#i-exclamation-circle-fill'
+      : kind === 'message' ? '#i-chat-left-text' : '#i-info-circle-fill');
     icon.append(use);
     const span = document.createElement('span');
     span.textContent = text;
     el.append(icon, span);
+    if (kind === 'message') el.addEventListener('click', () => { el.remove(); this.#openMessages(); });
     box.append(el);
     while (box.children.length > 3) box.firstElementChild.remove();
     setTimeout(() => el.remove(), kind === 'error' ? 7000 : 4000);
@@ -93,8 +90,14 @@ export class View {
       const current = local.get('filesync.theme') || 'auto';
       this.#applyTheme(THEMES[(THEMES.indexOf(current) + 1) % THEMES.length], true);
     });
-    $('about-btn').addEventListener('click', () => $('about-dialog').showModal());
-    $('new-room-btn').addEventListener('click', () => this.#opts.onNewRoom());
+    // About replaces the page content while open, like v1; the link turns into "Go back".
+    $('about-btn').addEventListener('click', () => {
+      this.#about = !this.#about;
+      $('about-btn').textContent = this.#about ? 'Go back' : 'About';
+      $('about-btn').setAttribute('aria-expanded', String(this.#about));
+      this.#render();
+      if (this.#about) $('about-title').scrollIntoView({ block: 'nearest' });
+    });
     $('brand').addEventListener('click', (ev) => { ev.preventDefault(); this.#opts.onNewRoom(); });
     $('insecure-close').addEventListener('click', () => {
       $('insecure-banner').hidden = true;
@@ -103,19 +106,28 @@ export class View {
     $('error-retry').addEventListener('click', () => location.reload());
 
     // Share
+    // The box shows the link up to the room code, which is easy to type; copying (button or
+    // keyboard) gives the full link with the key after the # that makes the join verified.
     $('share-link').addEventListener('focus', (ev) => ev.target.select());
-    $('copy-btn').addEventListener('click', () => this.#copy($('share-link').value, $('share-link')));
+    $('share-link').addEventListener('copy', (ev) => {
+      const input = ev.target;
+      if (input.selectionStart !== 0 || input.selectionEnd !== input.value.length) return;
+      ev.preventDefault();
+      ev.clipboardData.setData('text/plain', this.#opts.shareUrl());
+    });
+    $('copy-btn').addEventListener('click', () => this.#copy(this.#opts.shareUrl(), $('share-link')));
     if (typeof navigator.share === 'function') {
       $('share-btn').hidden = false;
       $('share-btn').addEventListener('click', () => {
         navigator.share({ title: 'FileSync', text: 'Join my FileSync room to get the files.', url: this.#opts.shareUrl() }).catch(() => {});
       });
     }
-    const wide = window.matchMedia('(min-width: 721px)');
-    const syncQr = () => { $('qr-box').open = wide.matches; };
-    wide.addEventListener('change', syncQr);
+    const syncQr = () => { $('qr-box').open = this.#wide.matches; this.#fitQr(); };
+    this.#wide.addEventListener('change', syncQr);
     syncQr();
     $('qr-box').addEventListener('toggle', () => this.#drawQr(true));
+    // On wide screens the QR runs from the status line to the bottom of the buttons.
+    new ResizeObserver(() => this.#fitQr()).observe(document.querySelector('.share-main'));
 
     // Password (host)
     $('password-btn').addEventListener('click', () => {
@@ -194,14 +206,21 @@ export class View {
       const text = ev.clipboardData?.getData('text/plain');
       if (text?.trim()) {
         ev.preventDefault();
+        this.#openMessages();
         $('text-input').value = text;
-        $('text-input').focus();
-        this.toast('Pasted into the message box. Select Send to share it.', 'info');
+        this.#fitComposer();
       }
     });
 
     // People
-    $('rename-btn').addEventListener('click', () => {
+    // Only a dialog's main action is a submit button, so Enter in its field saves. ✕, Cancel
+    // and Remove password close the dialog with their data-close value instead.
+    document.addEventListener('click', (ev) => {
+      const btn = ev.target.closest('dialog [data-close]');
+      if (btn) btn.closest('dialog').close(btn.dataset.close || 'cancel');
+    });
+    $('people').addEventListener('click', (ev) => {
+      if (!ev.target.closest('button[data-act="rename"]')) return;
       $('rename-input').value = room.me.name;
       $('rename-error').hidden = true;
       $('rename-dialog').showModal();
@@ -250,18 +269,31 @@ export class View {
     });
 
     // Messages
+    $('messages-btn').addEventListener('click', () => this.#openMessages());
+    $('messages-dialog').addEventListener('close', () => this.schedule());
     $('text-form').addEventListener('submit', (ev) => {
       ev.preventDefault();
-      if (room.sendText($('text-input').value)) $('text-input').value = '';
+      if (room.sendText($('text-input').value)) {
+        $('text-input').value = '';
+        this.#fitComposer();
+      }
     });
+    // Enter sends, Shift+Enter adds a line; the box grows with its text.
     $('text-input').addEventListener('keydown', (ev) => {
-      if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey)) $('text-form').requestSubmit();
+      if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) {
+        ev.preventDefault();
+        $('text-form').requestSubmit();
+      }
     });
+    $('text-input').addEventListener('input', () => this.#fitComposer());
     $('texts').addEventListener('click', (ev) => {
-      const btn = ev.target.closest('button[data-act="copy-text"]');
-      if (!btn) return;
-      const body = btn.closest('li.text')?.querySelector('.text-body');
-      if (body) this.#copy(body.textContent, null);
+      const btn = ev.target.closest('button[data-act]');
+      const li = btn?.closest('li.text');
+      if (!li) return;
+      if (btn.dataset.act === 'copy-text') this.#copy(li.querySelector('.text-body').textContent, null);
+      if (btn.dataset.act === 'delete-text' && !room.deleteText(li.dataset.id)) {
+        this.toast('Couldn’t delete the message: you’re not connected to the host. Try again in a moment.', 'warn');
+      }
     });
 
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => this.#syncThemeAssets());
@@ -272,10 +304,25 @@ export class View {
       const input = $(inputId);
       const show = input.type === 'password';
       input.type = show ? 'text' : 'password';
-      $(btnId).textContent = show ? 'Hide' : 'Show';
+      setIcon($(btnId).querySelector('use'), show ? '#i-eye-slash-fill' : '#i-eye-fill');
+      $(btnId).setAttribute('aria-label', show ? 'Hide password' : 'Show password');
       $(btnId).setAttribute('aria-pressed', String(show));
       input.focus();
     });
+  }
+
+  #openMessages() {
+    const dlg = $('messages-dialog');
+    if (!dlg.open) dlg.showModal();
+    this.#renderTexts();
+    $('messages-body').scrollTop = $('messages-body').scrollHeight;
+    $('text-input').focus();
+  }
+
+  #fitComposer() {
+    const ta = $('text-input');
+    ta.style.height = '';
+    if (ta.value) ta.style.height = `${ta.scrollHeight + 3}px`;
   }
 
   #canSend() {
@@ -293,7 +340,7 @@ export class View {
     try {
       await navigator.clipboard.writeText(text);
       if (fallbackInput) {
-        setIcon($('copy-icon'), '#i-check');
+        setIcon($('copy-icon'), '#i-check-lg');
         $('copy-label').textContent = 'Copied';
         setTimeout(() => { setIcon($('copy-icon'), '#i-copy'); $('copy-label').textContent = 'Copy'; }, 1600);
       }
@@ -311,7 +358,6 @@ export class View {
     if (mode === 'light' || mode === 'dark') document.documentElement.setAttribute('data-theme', mode);
     else document.documentElement.removeAttribute('data-theme');
     if (persist) local.set('filesync.theme', mode);
-    setIcon($('theme-icon'), THEME_ICON[mode]);
     $('theme-label').textContent = THEME_LABEL[mode];
     const next = THEMES[(THEMES.indexOf(mode) + 1) % THEMES.length];
     $('theme-btn').setAttribute('aria-label', `Theme: ${THEME_LABEL[mode]}. Switch to ${THEME_LABEL[next]}`);
@@ -324,7 +370,8 @@ export class View {
     const dark = explicit ? explicit === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
     const v = $('comic').src.split('?')[1];
     $('comic').src = `/assets/${dark ? 'comic-dark' : 'comic'}.png${v ? `?${v}` : ''}`;
-    for (const meta of document.querySelectorAll('meta[name="theme-color"]')) meta.content = dark ? '#111418' : '#f6f7f9';
+    for (const meta of document.querySelectorAll('meta[name="theme-color"]')) meta.content = dark ? '#212529' : '#ffffff';
+    this.#drawQr(true); // the modules use the theme's text color
   }
 
   #showPasswordError(text) {
@@ -340,15 +387,30 @@ export class View {
     drawQr($('qr'), url);
   }
 
+  #fitQr() {
+    const canvas = $('qr');
+    let size = 185;
+    if (this.#wide.matches) {
+      const top = document.querySelector('.status-row').getBoundingClientRect().top;
+      const bottom = document.querySelector('.send-actions').getBoundingClientRect().bottom;
+      if (bottom <= top) return; // not laid out yet
+      size = Math.round(Math.min(260, Math.max(150, bottom - top)));
+    }
+    if (Math.abs(canvas.clientWidth - size) < 2 && canvas.style.width) return;
+    canvas.style.width = canvas.style.height = `${size}px`;
+    this.#drawQr(true);
+  }
+
   // ---- render ---------------------------------------------------------------------------
 
   #render() {
     const room = this.#room;
-    $('joining').hidden = room.phase !== 'joining' && room.phase !== 'starting';
-    $('password-panel').hidden = room.phase !== 'password';
-    $('error-panel').hidden = room.phase !== 'error';
-    $('room').hidden = room.phase !== 'ready';
-    $('new-room-btn').hidden = room.phase !== 'ready' && room.phase !== 'error';
+    const about = this.#about;
+    $('about-panel').hidden = !about;
+    $('joining').hidden = about || (room.phase !== 'joining' && room.phase !== 'starting');
+    $('password-panel').hidden = about || room.phase !== 'password';
+    $('error-panel').hidden = about || room.phase !== 'error';
+    $('room').hidden = about || room.phase !== 'ready';
 
     if (room.version) {
       $('version').textContent = /^\d/.test(room.version) ? `v${room.version}` : room.version;
@@ -414,7 +476,9 @@ export class View {
   #renderShare() {
     const room = this.#room;
     const url = this.#opts.shareUrl();
-    if ($('share-link').value !== url) $('share-link').value = url;
+    const shown = url.split('#')[0];
+    if ($('share-link').value !== shown) $('share-link').value = shown;
+    $('share-link').dataset.link = url;
     this.#drawQr();
 
     const others = [...room.members.values()].filter((m) => !m.isMe);
@@ -422,16 +486,16 @@ export class View {
     if (room.isHost) {
       document.title = others.length ? `FileSync · ${others.length} connected` : 'FileSync · Waiting for people';
       dot.className = `dot ${others.length ? 'ok' : 'wait'}`;
-      $('status-text').textContent = others.length === 0 ? 'Waiting for people to join'
-        : others.length === 1 ? '1 person connected' : `${others.length} people connected`;
-      $('share-title').textContent = 'Share this link with the devices you want to send files to';
+      $('status-text').textContent = others.length === 0 ? 'Waiting for people to join…'
+        : others.length === 1 ? `Connected to ${others[0].name}` : `${others.length} people connected`;
+      $('share-title').textContent = 'Share the room link with the devices you want to send files to.';
     } else {
       const host = room.members.get(room.hostId);
       const reconnecting = room.hostLink === 'reconnecting';
       document.title = 'FileSync · Room';
       dot.className = `dot ${reconnecting ? 'wait' : 'ok'}`;
       $('status-text').textContent = reconnecting ? 'Reconnecting to the host…' : `Connected to ${host?.name || 'the host'}`;
-      $('share-title').textContent = 'You’re in the room. Invite more devices with this link';
+      $('share-title').textContent = 'You’re in the room. Invite more devices with this link.';
     }
 
     const vb = $('verify-badge');
@@ -444,13 +508,13 @@ export class View {
       icon.append(use);
       const label = document.createElement('span');
       if (room.verified) {
-        vb.className = 'badge ok';
-        use.setAttribute('href', '#i-shield');
-        label.textContent = 'Verified connection';
+        vb.className = 'pill ok';
+        use.setAttribute('href', '#i-shield-fill-check');
+        label.textContent = 'Verified';
         vb.title = 'The link’s security key confirmed that you’re connected directly to the host, with nobody in between.';
       } else {
-        vb.className = 'badge';
-        use.setAttribute('href', '#i-info');
+        vb.className = 'pill';
+        use.setAttribute('href', '#i-info-circle');
         label.textContent = 'Not verified';
         vb.title = 'You joined without the security key that shared links include, so FileSync can’t rule out a server in the middle. Use the full shared link to verify.';
       }
@@ -458,7 +522,7 @@ export class View {
     }
     $('password-badge').hidden = !room.secured;
     $('password-btn').hidden = !room.isHost;
-    $('password-btn').textContent = room.secured ? 'Change password' : 'Add a password';
+    $('password-btn-label').textContent = room.secured ? 'Change password' : 'Add password';
   }
 
   #renderPeople() {
@@ -466,20 +530,26 @@ export class View {
     const list = $('people');
     const tpl = $('person-tpl');
     const members = [...room.members.values()].sort((a, b) => (b.isHost - a.isHost) || (b.isMe - a.isMe) || a.name.localeCompare(b.name));
+    // Rebuild only when the list changes, so the Change name button keeps focus mid-transfer.
+    const key = JSON.stringify([room.isHost, members.map((m) => [m.id, m.name, m.isHost, m.isMe, m.verified])]);
+    if (key === this.#peopleKey) return;
+    this.#peopleKey = key;
+    const hadFocus = list.contains(document.activeElement);
     const rows = members.map((m) => {
       const li = tpl.content.firstElementChild.cloneNode(true);
-      const av = li.querySelector('.avatar');
-      av.textContent = initials(m.name);
-      av.style.setProperty('--avatar', avatarColor(m.id));
-      li.querySelector('.person-name').textContent = m.name;
-      li.querySelector('.host-tag').hidden = !m.isHost;
-      li.querySelector('.me-tag').hidden = !m.isMe;
-      li.querySelector('.verified-tag').hidden = !(room.isHost && !m.isMe && m.verified);
+      // v1 markers: a star for the host, a bolt for everyone connected.
+      li.classList.toggle('host', m.isHost);
+      setIcon(li.querySelector('.role use'), m.isHost ? '#i-star-fill' : '#i-lightning-charge-fill');
+      li.querySelector('.role').setAttribute('aria-label', m.isHost ? 'Host' : 'Connected');
+      li.querySelector('.role').setAttribute('role', 'img');
+      li.querySelector('.person-name').textContent = m.isMe ? `${m.name} (You)` : m.name;
+      li.querySelector('.verified-tag').toggleAttribute('hidden', !(room.isHost && !m.isMe && m.verified));
+      li.querySelector('.rename').hidden = !m.isMe;
       return li;
     });
     list.replaceChildren(...rows);
+    if (hadFocus) list.querySelector('.rename:not([hidden])')?.focus();
     $('people-count').textContent = `(${members.length})`;
-    $('people-empty').hidden = members.length > 1;
   }
 
   #renderFiles() {
@@ -494,7 +564,7 @@ export class View {
       li.dataset.id = f.id;
       li.querySelector('.file-base').textContent = f.name;
       li.querySelector('.file-path').textContent = f.path ? `${f.path}/` : '';
-      li.querySelector('.file-ext').textContent = typeLabel(f.name);
+      li.title = `${f.path ? `${f.path}/` : ''}${f.name} (${typeLabel(f.name)})`;
       list.prepend(li);
       this.#fileRows.set(f.id, li);
     }
@@ -515,8 +585,8 @@ export class View {
   #renderFile(li, f) {
     const room = this.#room;
     const owner = f.mine ? 'you' : (room.members.get(f.owner)?.name || 'someone who left');
-    const thumb = li.querySelector('.file-thumb img');
-    if (f.thumb && thumb.getAttribute('src') !== f.thumb) { thumb.src = f.thumb; thumb.hidden = false; li.querySelector('.file-ext').hidden = true; }
+    const thumb = li.querySelector('.file-thumb');
+    if (f.thumb && thumb.getAttribute('src') !== f.thumb) { thumb.src = f.thumb; thumb.hidden = false; }
 
     const meta = li.querySelector('.file-meta');
     const note = li.querySelector('.file-note');
@@ -526,11 +596,11 @@ export class View {
     let noteText = '';
     let noteKind = '';
     let barState = null;
-    let metaText = `${formatBytes(f.size)} · from ${owner}`;
+    let metaText = `${formatBytes(f.size)} | Sent by ${owner}`;
     const inBundle = room.bundle?.state === 'running' && room.bundle.ids.has(f.id);
 
     if (f.mine) {
-      metaText = `${formatBytes(f.size)} · shared by you`;
+      metaText = `${formatBytes(f.size)} | Sent by you`;
       if (f.status === 'shared') {
         show.remove = true;
         const recs = [...f.receivers.values()];
@@ -541,7 +611,7 @@ export class View {
           const parts = [];
           if (sending) parts.push(`sending to ${sending}`);
           if (done) parts.push(`${done} received`);
-          recv.querySelector('summary').textContent = parts.length ? parts.join(' · ').replace(/^./, (c) => c.toUpperCase()) : `${recs.length} stopped`;
+          recv.querySelector('summary').textContent = `See details (${parts.length ? parts.join(', ') : `${recs.length} stopped`})`;
           const items = recs.map((r) => {
             const item = document.createElement('li');
             const name = document.createElement('span');
@@ -565,30 +635,30 @@ export class View {
           show.download = !inBundle;
           break;
         case 'waiting':
-          metaText = `${formatBytes(f.size)} · connecting to ${owner}…`;
+          metaText = `${formatBytes(f.size)} | Connecting to ${owner}…`;
           barState = 'paused';
           show.cancel = !inBundle;
           break;
         case 'queued':
-          metaText = `${formatBytes(f.size)} · ${owner} is busy, you’re ${ordinal(f.queuePos || 1)} in line`;
+          metaText = `${formatBytes(f.size)} | ${owner} is busy, you’re ${ordinal(f.queuePos || 1)} in line`;
           barState = 'paused';
           show.cancel = !inBundle;
           break;
         case 'transferring': {
           const rate = f.meter.rate;
           const left = rate > 0 ? (f.size - f.written) / rate : NaN;
-          metaText = `${formatBytes(f.written)} of ${formatBytes(f.size)}${rate > 0 ? ` · ${formatRate(rate)} · ${formatDuration(left)} left` : ''}`;
+          metaText = `${formatBytes(f.written)} of ${formatBytes(f.size)}${rate > 0 ? ` | ${formatRate(rate)} | ${formatDuration(left)} left` : ''}`;
           barState = 'active';
           show.cancel = !inBundle;
           break;
         }
         case 'retrying':
-          metaText = `${formatBytes(f.written)} of ${formatBytes(f.size)} · reconnecting…`;
+          metaText = `${formatBytes(f.written)} of ${formatBytes(f.size)} | Reconnecting…`;
           barState = 'paused';
           show.cancel = !inBundle;
           break;
         case 'paused':
-          metaText = `${formatBytes(f.written)} of ${formatBytes(f.size)} · paused`;
+          metaText = `${formatBytes(f.written)} of ${formatBytes(f.size)} | Paused`;
           barState = 'paused';
           noteText = f.error || '';
           noteKind = 'bad';
@@ -617,7 +687,15 @@ export class View {
     note.className = `file-note ${noteKind}`;
     note.textContent = noteText;
     if (f.status === 'done' && f.sha256) note.title = `SHA-256: ${f.sha256}`; else note.removeAttribute('title');
-    li.querySelector('.done-mark').hidden = f.status !== 'done';
+    // v1 row marker: arrow for direction, spinner while moving, check or cross when settled.
+    const busy = !f.mine && ['waiting', 'queued', 'transferring', 'retrying'].includes(f.status);
+    const state = li.querySelector('.state');
+    const mark = f.status === 'done' ? ['#i-check-circle-fill', 'ok'] : f.status === 'failed' ? ['#i-x-circle-fill', 'bad']
+      : [f.mine ? '#i-arrow-up-short' : '#i-arrow-down-short', ''];
+    setIcon(state.querySelector('use'), mark[0]);
+    state.setAttribute('class', `icon state ${mark[1]}`);
+    state.toggleAttribute('hidden', busy);
+    li.querySelector('.file-name .spinner').hidden = !busy;
     bar.hidden = !barState;
     if (barState) {
       bar.className = `bar ${barState === 'done' ? 'done' : barState === 'paused' ? 'paused' : ''}`;
@@ -629,12 +707,13 @@ export class View {
       bar.setAttribute('aria-valuemin', '0');
       bar.setAttribute('aria-valuemax', '100');
     }
+    li.querySelector('[data-act="download"] span').textContent = f.status === 'done' ? 'Download again' : 'Download';
     for (const btn of li.querySelectorAll('button[data-act]')) {
       btn.hidden = !show[btn.dataset.act];
-      btn.setAttribute('aria-label', `${btn.textContent.trim()}: ${f.name}`);
+      const label = btn.textContent.trim();
+      btn.title = label;
+      btn.setAttribute('aria-label', `${label}: ${f.name}`);
     }
-    if (show.download && f.status === 'done') li.querySelector('[data-act="download"] span').textContent = 'Download again';
-    else li.querySelector('[data-act="download"] span').textContent = 'Download';
   }
 
   #renderBundle() {
@@ -667,9 +746,15 @@ export class View {
     const room = this.#room;
     const list = $('texts');
     const tpl = $('text-tpl');
+    let added = false;
     for (const t of room.texts) {
       if (this.#textRows.has(t.id)) continue;
       const li = tpl.content.firstElementChild.cloneNode(true);
+      li.classList.toggle('mine', t.from === room.me.id);
+      li.querySelector('[data-act="delete-text"]').hidden = t.from !== room.me.id;
+      li.dataset.id = t.id;
+      li.dataset.from = t.from;
+      li.dataset.at = String(t.at);
       li.querySelector('.text-from').textContent = t.from === room.me.id ? 'You' : t.name;
       const time = li.querySelector('time');
       const d = new Date(t.at);
@@ -682,11 +767,28 @@ export class View {
         a.href = trimmed;
         a.hidden = false;
       }
-      list.prepend(li);
+      added = true;
+      list.append(li);
       this.#textRows.set(t.id, li);
     }
     const ids = new Set(room.texts.map((t) => t.id));
     for (const [id, li] of this.#textRows) if (!ids.has(id)) { li.remove(); this.#textRows.delete(id); }
     $('texts-count').textContent = room.texts.length ? `(${room.texts.length})` : '';
+    $('texts-empty').hidden = room.texts.length > 0;
+    // A run of messages from one sender within two minutes shows the name and time once.
+    let prev = null;
+    for (const li of list.children) {
+      li.classList.toggle('cont', !!prev && prev.dataset.from === li.dataset.from && li.dataset.at - prev.dataset.at < 120000);
+      prev = li;
+    }
+
+    // Unread: messages from others that arrived while the dialog was closed.
+    const open = $('messages-dialog').open;
+    if (open) for (const t of room.texts) this.#seenTexts.add(t.id);
+    if (open && added) $('messages-body').scrollTop = $('messages-body').scrollHeight;
+    const unread = room.texts.filter((t) => t.from !== room.me.id && !this.#seenTexts.has(t.id)).length;
+    $('messages-badge').hidden = !unread;
+    $('messages-badge').textContent = unread > 99 ? '99+' : String(unread);
+    $('messages-btn').setAttribute('aria-label', unread ? `Messages, ${unread} unread` : 'Messages');
   }
 }
