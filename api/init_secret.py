@@ -1,4 +1,4 @@
-"""Provision the shared TURN/JWT signing secret on first boot.
+"""Provision the shared TURN signing secret on first boot.
 
 Idempotent: writes a random 256-bit key to SECRET_FILE only if it does not
 exist yet, so the key rotates only when the volume holding it is deleted.
