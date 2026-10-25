@@ -2,7 +2,7 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['**/node_modules/**', 'web/js/vendors/**', 'e2e/**'],
+    ignores: ['**/node_modules/**', '**/.venv/**', 'web/js/vendors/**', 'e2e/**'],
   },
   {
     files: ['web/js/**/*.js', 'web/sw.js'],

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>FileSync video</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="stage">
+    <div id="bg">
+      <div class="glow g1"></div>
+      <div class="glow g2"></div>
+      <!-- the logo's signal arcs: a wave runs out through them at every cut -->
+      <svg class="arcs" width="1920" height="1080" viewBox="0 0 1920 1080"></svg>
+      <div class="dust"></div>
+      <div class="vignette"></div>
+    </div>
+    <div id="scenes"></div>
+    <!-- the ring of signal that carries every cut -->
+    <div id="ring"></div>
+    <div id="blackout"></div>
+  </div>
+  <script src="engine.js"></script>
+  <script src="scenes.js"></script>
+</body>
+</html>
