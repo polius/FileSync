@@ -14,6 +14,18 @@ const URL_RE = /^https?:\/\/[^\s<>"']+$/i;
 
 function setIcon(useEl, href) { useEl.setAttribute('href', href); }
 
+function percent(done, total) { return `${Math.floor((Math.min(done, total) / Math.max(1, total)) * 100)}%`; }
+
+function svgIcon(href) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'icon');
+  svg.setAttribute('aria-hidden', 'true');
+  const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+  use.setAttribute('href', href);
+  svg.append(use);
+  return svg;
+}
+
 function ordinal(n) {
   const s = ['th', 'st', 'nd', 'rd'];
   const v = n % 100;
@@ -78,7 +90,11 @@ export class View {
     if (kind === 'message') el.addEventListener('click', () => { el.remove(); this.#openMessages(); });
     box.append(el);
     while (box.children.length > 3) box.firstElementChild.remove();
-    setTimeout(() => el.remove(), kind === 'error' ? 7000 : 4000);
+    // Confirmations go quickly; anything to read or act on stays longer. Fades out.
+    setTimeout(() => {
+      el.classList.add('leaving');
+      el.addEventListener('animationend', () => el.remove(), { once: true });
+    }, kind === 'success' ? 2500 : kind === 'error' ? 7000 : 4000);
   }
 
   // ---- binding --------------------------------------------------------------------------
@@ -116,6 +132,9 @@ export class View {
       ev.clipboardData.setData('text/plain', this.#opts.shareUrl());
     });
     $('copy-btn').addEventListener('click', () => this.#copy(this.#opts.shareUrl(), $('share-link')));
+    // A click copies without focusing or selecting; Tab focus still selects for keyboard copy.
+    $('share-link').addEventListener('mousedown', (ev) => ev.preventDefault());
+    $('share-link').addEventListener('click', () => this.#copy(this.#opts.shareUrl(), $('share-link')));
     if (typeof navigator.share === 'function') {
       $('share-btn').hidden = false;
       $('share-btn').addEventListener('click', () => {
@@ -606,19 +625,45 @@ export class View {
         const recs = [...f.receivers.values()];
         recv.hidden = recs.length === 0;
         if (recs.length) {
-          const sending = recs.filter((r) => r.status === 'sending').length;
-          const done = recs.filter((r) => r.status === 'done').length;
+          const count = (status) => recs.filter((r) => r.status === status).length;
+          const sending = count('sending');
+          const done = count('done');
+          const paused = count('paused');
+          const stopped = recs.length - sending - done - paused;
           const parts = [];
-          if (sending) parts.push(`sending to ${sending}`);
-          if (done) parts.push(`${done} received`);
-          recv.querySelector('summary').textContent = `See details (${parts.length ? parts.join(', ') : `${recs.length} stopped`})`;
+          if (sending) parts.push(`Sending to ${sending}`);
+          if (done) parts.push(`Received by ${done}`);
+          if (paused) parts.push(`${paused} interrupted`);
+          if (stopped) parts.push(`${stopped} stopped`);
+          recv.querySelector('.recv-summary').textContent = parts.map((p, i) => (i ? p[0].toLowerCase() + p.slice(1) : p)).join(' · ');
+          const summaryIcon = recv.querySelector('.icon.state');
+          summaryIcon.setAttribute('class', `icon state ${sending ? 'sending' : done === recs.length ? 'ok' : ''}`);
+          setIcon(summaryIcon.querySelector('use'), sending ? '#i-arrow-up-short' : done === recs.length ? '#i-check-circle-fill' : '#i-exclamation-circle-fill');
           const items = recs.map((r) => {
             const item = document.createElement('li');
             const name = document.createElement('span');
+            name.className = 'recv-name';
             name.textContent = r.name;
             const state = document.createElement('span');
-            state.textContent = r.status === 'done' ? 'Received' : r.status === 'sending' ? `${Math.floor((r.bytes / Math.max(1, f.size)) * 100)}%`
-              : r.status === 'paused' ? 'Interrupted' : 'Stopped';
+            const label = document.createElement('span');
+            if (r.status === 'sending') {
+              const pct = Math.floor((r.bytes / Math.max(1, f.size)) * 100);
+              const bar = document.createElement('span');
+              bar.className = 'bar';
+              bar.setAttribute('aria-hidden', 'true');
+              const fill = document.createElement('span');
+              fill.style.setProperty('--p', `${pct}%`);
+              bar.append(fill);
+              label.textContent = `${pct}%`;
+              state.className = 'recv-state';
+              state.append(bar, label);
+            } else {
+              const [cls, href, text] = r.status === 'done' ? ['ok', '#i-check-circle-fill', 'Received']
+                : r.status === 'paused' ? ['warn', '#i-exclamation-circle-fill', 'Interrupted'] : ['', '#i-x-circle-fill', 'Stopped'];
+              label.textContent = text;
+              state.className = `recv-state ${cls}`;
+              state.append(svgIcon(href), label);
+            }
             item.append(name, state);
             return item;
           });
@@ -647,18 +692,18 @@ export class View {
         case 'transferring': {
           const rate = f.meter.rate;
           const left = rate > 0 ? (f.size - f.written) / rate : NaN;
-          metaText = `${formatBytes(f.written)} of ${formatBytes(f.size)}${rate > 0 ? ` | ${formatRate(rate)} | ${formatDuration(left)} left` : ''}`;
+          metaText = `${percent(f.written, f.size)} | ${formatBytes(f.written)} of ${formatBytes(f.size)}${rate > 0 ? ` | ${formatRate(rate)} | ${formatDuration(left)} left` : ''}`;
           barState = 'active';
           show.cancel = !inBundle;
           break;
         }
         case 'retrying':
-          metaText = `${formatBytes(f.written)} of ${formatBytes(f.size)} | Reconnecting…`;
+          metaText = `${percent(f.written, f.size)} | ${formatBytes(f.written)} of ${formatBytes(f.size)} | Reconnecting…`;
           barState = 'paused';
           show.cancel = !inBundle;
           break;
         case 'paused':
-          metaText = `${formatBytes(f.written)} of ${formatBytes(f.size)} | Paused`;
+          metaText = `${percent(f.written, f.size)} | ${formatBytes(f.written)} of ${formatBytes(f.size)} | Paused`;
           barState = 'paused';
           noteText = f.error || '';
           noteKind = 'bad';
@@ -722,14 +767,14 @@ export class View {
     if (!b) return;
     if (b.state === 'cancelled') { this.#room.dismissBundle(); return; }
     const current = b.current?.file;
-    const bytes = b.doneBytes + (current && b.state === 'running' ? current.written : 0);
+    const bytes = Math.min(b.total, b.doneBytes + (current && b.state === 'running' ? current.written : 0));
     const pct = b.total ? Math.min(100, (bytes / b.total) * 100) : 0;
     const bar = $('bundle-bar');
     bar.querySelector('span').style.setProperty('--p', `${b.state === 'done' ? 100 : pct.toFixed(1)}%`);
     bar.className = `bar ${b.state === 'done' ? 'done' : b.state === 'failed' ? 'paused' : ''}`;
     if (b.state === 'running') {
       $('bundle-title').textContent = `Downloading ${Math.min(b.index, b.count)} of ${b.count} files as one zip`;
-      $('bundle-detail').textContent = `${formatBytes(bytes)} of ${formatBytes(b.total)}`;
+      $('bundle-detail').textContent = `${percent(bytes, b.total)} | ${formatBytes(bytes)} of ${formatBytes(b.total)}`;
       $('bundle-action').textContent = 'Cancel';
     } else if (b.state === 'done') {
       $('bundle-title').textContent = 'Zip saved';

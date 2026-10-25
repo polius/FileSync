@@ -307,6 +307,7 @@ export class Room extends Emitter {
         try {
           await dl.done;
           bundle.doneBytes += f.size;
+          bundle.current = null;   // now counted in doneBytes; leaving it set counted it twice
         } catch (err) {
           aborted = err;
           return;

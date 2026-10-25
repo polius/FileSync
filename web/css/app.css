@@ -277,7 +277,7 @@ textarea { resize: none; display: block; }
 .pill.ok { color: var(--success-text); border-color: color-mix(in srgb, var(--success-text) 45%, transparent); }
 
 .share-title { font-size: 17px; font-weight: 500; line-height: 1.5; color: var(--text); }
-.link-field { font-family: var(--mono) !important; color: var(--url) !important; padding-top: 12px !important; padding-bottom: 12px !important; text-overflow: ellipsis; }
+.link-field { cursor: pointer; font-family: var(--mono) !important; color: var(--url) !important; padding-top: 12px !important; padding-bottom: 12px !important; text-overflow: ellipsis; }
 .send-actions { display: flex; flex-wrap: wrap; gap: 12px; padding-top: 2px; }
 .label-short { display: none; }
 .hint { margin-top: -3px; font-size: 13px; color: var(--muted); }
@@ -332,11 +332,24 @@ textarea { resize: none; display: block; }
 .bar.done > span { background: var(--success); }
 .bar.paused > span { background: var(--muted); }
 
-.receivers summary { display: inline-block; color: var(--url); cursor: pointer; list-style: none; }
+.receivers { margin-top: 4px; }
+.receivers summary { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; list-style: none; border-radius: 6px; transition: color 0.2s ease; }
 .receivers summary::-webkit-details-marker { display: none; }
-.receivers summary:hover { text-decoration: underline; }
-.receivers ul { list-style: none; margin: 6px 0 2px; padding: 0; display: grid; gap: 3px; max-width: 360px; color: var(--muted); }
-.receivers li { display: flex; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
+.receivers summary:hover { color: var(--text); }
+.receivers summary .icon { width: 14px; height: 14px; }
+.receivers summary .state.ok { color: var(--success-text); }
+.receivers summary .state.sending { color: var(--url); }
+.receivers summary .chev { width: 11px; height: 11px; transition: transform 0.2s ease; }
+.receivers[open] summary .chev { transform: rotate(180deg); }
+.receivers ul { list-style: none; margin: 8px 0 2px; padding: 0; width: fit-content; min-width: 220px; max-width: min(420px, 100%); border: 1px solid var(--border); border-radius: 10px; background: var(--surface-head); overflow: hidden; }
+.receivers li { display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 8px 12px; font-size: 13px; color: var(--text); }
+.receivers li + li { border-top: 1px solid var(--border); }
+.recv-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recv-state { display: inline-flex; align-items: center; gap: 6px; flex: none; color: var(--muted); font-variant-numeric: tabular-nums; }
+.recv-state .icon { width: 13px; height: 13px; }
+.recv-state.ok { color: var(--success-text); }
+.recv-state.warn { color: var(--warn-text); }
+.recv-state .bar { width: 64px; height: 4px; margin: 0; }
 
 .bundle { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; align-items: center; padding: 12px 18px; border-bottom: 1px solid var(--border); text-align: left; }
 .bundle .bar { grid-column: 1 / -1; margin: 0; }
@@ -380,13 +393,16 @@ textarea { resize: none; display: block; }
 .drop-target { display: grid; justify-items: center; gap: 12px; padding: 48px 40px; border: 2px dashed var(--primary); border-radius: var(--radius); background: var(--surface); color: var(--url); font-weight: 600; font-size: 17px; text-align: center; box-shadow: var(--shadow-lg); }
 .drop-target .icon { width: 40px; height: 40px; }
 
-.toasts { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 160; display: grid; gap: 8px; width: min(440px, calc(100vw - 32px)); pointer-events: none; }
-.toast { pointer-events: auto; display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 10px; background: var(--surface); color: var(--strong); border: 1px solid var(--border); font-size: 14px; font-weight: 500; box-shadow: var(--shadow-lg); animation: toast-in 0.2s ease-out; }
+/* Newest on top: toasts are appended, so the column is reversed. */
+.toasts { position: fixed; left: 50%; top: max(16px, env(safe-area-inset-top)); transform: translateX(-50%); z-index: 160; display: flex; flex-direction: column-reverse; align-items: center; gap: 8px; width: min(440px, calc(100vw - 32px)); pointer-events: none; }
+.toast { pointer-events: auto; max-width: 100%; display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 10px; background: var(--surface); color: var(--strong); border: 1px solid var(--border); font-size: 14px; font-weight: 500; box-shadow: var(--shadow-lg); animation: toast-in 0.2s ease-out; }
 .toast .icon { width: 16px; height: 16px; color: var(--url); }
 .toast.message { cursor: pointer; }
 .toast.success .icon { color: var(--success-text); }
 .toast.error .icon, .toast.warn .icon { color: var(--danger-text); }
-@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes toast-in { from { opacity: 0; transform: translateY(-8px); } }
+.toast.leaving { animation: toast-out 0.2s ease-in forwards; }
+@keyframes toast-out { to { opacity: 0; transform: translateY(-8px); } }
 
 .dialog { border: 1px solid var(--border); padding: 0; border-radius: 16px; background: var(--surface); color: var(--text); box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.35); width: min(460px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); }
 .dialog[open] { animation: dialog-in 0.18s ease-out; }

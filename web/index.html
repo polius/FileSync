@@ -166,7 +166,7 @@
           <h1 class="share-title" id="share-title">Share the room link with the devices you want to send files to.</h1>
           <div class="input-group link-group">
             <label class="visually-hidden" for="share-link">Room link</label>
-            <input id="share-link" class="link-field" type="text" readonly spellcheck="false">
+            <input id="share-link" class="link-field" type="text" readonly spellcheck="false" title="Click to copy">
             <button type="button" class="addon" id="copy-btn" title="Copy link"><svg class="icon"><use href="#i-copy" id="copy-icon"/></svg><span class="visually-hidden" id="copy-label">Copy</span></button>
             <button type="button" class="addon" id="share-btn" title="Share link" hidden><svg class="icon"><use href="#i-box-arrow-up"/></svg><span class="visually-hidden">Share</span></button>
           </div>
@@ -329,7 +329,7 @@
         <p class="file-meta"></p>
         <div class="bar" hidden><span></span></div>
         <p class="file-note" hidden></p>
-        <details class="receivers" hidden><summary></summary><ul></ul></details>
+        <details class="receivers" hidden><summary><svg class="icon state"><use/></svg><span class="recv-summary"></span><svg class="icon chev"><use href="#i-chevron-down"/></svg></summary><ul></ul></details>
       </div>
       <div class="file-actions">
         <button type="button" class="round-btn" data-act="download" hidden><svg class="icon"><use href="#i-arrow-down-circle"/></svg><span class="visually-hidden">Download</span></button>
