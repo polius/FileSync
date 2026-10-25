@@ -18,7 +18,7 @@
 //   const iceServers = await turn.getServers();
 //   const peer = new Peer(id, { config: applyIceMode({ iceServers }) });
 
-import { addDevBadge } from '../devBadge.js';
+import { addDevBadge } from './devBadge.js';
 
 const ICE_MODES = ['auto', 'stun', 'turn'];
 const STORAGE_KEY = 'filesync.ice';

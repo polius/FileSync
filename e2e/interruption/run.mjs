@@ -9,7 +9,7 @@
 //     that crosses the wire + binary frame counts, so "the sender never sent a
 //     cancel frame" is provable from the wire, not from reading code
 //   - the file-row UI state on both sides (progress %, spinner, error text)
-//   - the fatal-error page state (#error-div)
+//   - the room phase and any fatal error (window.__filesync.room)
 //   - the receiver's browser-download lifecycle (started / failed / completed)
 //
 // Scenarios (--scenario=):
@@ -24,7 +24,7 @@
 //         an error vs the sender's 4s watchdog?
 //   t5    sender browser SIGKILLed mid-transfer -> receiver's detection latency
 //   zip   "Download all" bundle (2 files): receiver's network service SIGSTOP 20s
-//         while file 2 is mid-transfer -> transparent resume; final files.zip is
+//         while file 2 is mid-transfer -> transparent resume; final bundle zip is
 //         unpacked and every member hash is compared against the source fixtures
 //
 // Usage:  node run.mjs --scenario=t2 [--sink=sw] [--ice=auto] [--size=419430400]
@@ -175,28 +175,14 @@ async function samplePage(page, label, t) {
   try {
     s.ui = await Promise.race([
       page.evaluate(() => {
-        const row = document.querySelector('[id^="file-"][id$="-progress"]');
-        const rowRoot = row ? row.closest('li') : null;
-        const idpfx = rowRoot ? rowRoot.id : null;
-        const st = (suffix) => {
-          const el = idpfx ? document.getElementById(`${idpfx}-${suffix}`) : null;
-          return el ? el.style.display : null;
-        };
-        const errEl = idpfx ? document.getElementById(`${idpfx}-error`) : null;
+        const room = window.__filesync?.room;
+        const f = room ? [...room.files.values()][0] : null;
         return {
-          fileRow: idpfx,
-          progress: row ? row.textContent : null,
-          loading: st('icon-loading'),
-          success: st('icon-success'),
-          failed: st('icon-failed'),
-          downloadBtn: st('download'),
-          abortBtn: st('abort'),
-          rowError: errEl ? { shown: errEl.style.display === 'block', text: errEl.textContent } : null,
-          transferDiv: document.getElementById('transfer-div')?.style.display ?? null,
-          fatal: {
-            shown: document.getElementById('error-div')?.style.display === 'block',
-            message: document.getElementById('error-message')?.textContent ?? null,
-          },
+          file: f ? { status: f.status, written: f.written, size: f.size, error: f.error, sha256: f.sha256 } : null,
+          bundle: room?.bundle ? { state: room.bundle.state, index: room.bundle.index, count: room.bundle.count } : null,
+          phase: room?.phase ?? null,
+          fatal: room?.error ?? null,
+          hostLink: room?.hostLink ?? null,
         };
       }),
       timeout(2000),
@@ -289,13 +275,15 @@ async function pair({ senderB, receiverB, qs }) {
   }
 
   await sender.goto(`${BASE_URL}/?${qs}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  await sender.waitForSelector('#transfer-div', { state: 'visible', timeout: 30000 });
-  const shareUrl = (await sender.locator('#transfer-url-value').textContent({ timeout: 30000 })).trim();
+  await sender.waitForSelector('#room', { state: 'visible', timeout: 30000 });
+  const shareUrl = await sender.inputValue('#share-link', { timeout: 30000 });
   if (!shareUrl) throw new Error('no share URL');
 
-  await receiver.goto(`${shareUrl}?${qs}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  await receiver.waitForSelector('#transfer-div', { state: 'visible', timeout: 30000 });
-  await sender.waitForSelector('#transfer-status-success', { state: 'visible', timeout: 30000 });
+  const u = new URL(shareUrl);
+  u.search = qs;   // the query goes before the #k= security key
+  await receiver.goto(u.toString(), { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await receiver.waitForSelector('#room', { state: 'visible', timeout: 30000 });
+  await sender.waitForSelector('#status-dot.ok', { timeout: 30000 });
   return { sender, receiver, shareUrl };
 }
 
@@ -303,10 +291,10 @@ async function pair({ senderB, receiverB, qs }) {
 // Download at delivery — SW staging delivers the browser download only at completion).
 async function startTransfer({ sender, receiver, fixture }) {
   const downloadPromise = receiver.waitForEvent('download', { timeout: 300000 });
-  await sender.setInputFiles('#transfer-select-file-input', fixture.path);
-  const row = receiver.locator('#transfer-files-list li:not(#transfer-files-list-empty)').first();
+  await sender.setInputFiles('#file-input', fixture.path);
+  const row = receiver.locator('#files li.file').first();
   await row.waitFor({ state: 'visible', timeout: 30000 });
-  await row.locator('[id^="file-"][id$="-download"]').first().click();
+  await row.locator('[data-act="download"]').click();
   return { downloadPromise };
 }
 
@@ -315,13 +303,12 @@ async function waitForReceiverProgress(receiver, pct, timeoutMs = 120000) {
   while (Date.now() < deadline) {
     const txt = await Promise.race([
       receiver.evaluate(() => {
-        const row = document.querySelector('[id^="file-"][id$="-progress"]');
-        return row ? row.textContent : '';
+        const f = window.__filesync?.room ? [...window.__filesync.room.files.values()][0] : null;
+        return f && f.size ? Math.floor((f.written / f.size) * 100) : 0;
       }),
       timeout(1500).then(() => null),
     ]);
-    const m = txt && txt.match(/^(\d+)%/);
-    if (m && Number(m[1]) >= pct) return Number(m[1]);
+    if (txt !== null && txt >= pct) return txt;
     await timeout(250);
   }
   throw new Error(`receiver never reached ${pct}%`);
@@ -331,11 +318,15 @@ async function waitForModalProgress(receiver, pct, timeoutMs = 120000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const txt = await Promise.race([
-      receiver.evaluate(() => document.getElementById('download-modal-value')?.textContent ?? ''),
+      receiver.evaluate(() => {
+        const b = window.__filesync?.room?.bundle;
+        if (!b || !b.total) return 0;
+        const cur = b.current?.file?.written || 0;
+        return Math.floor(((b.doneBytes + cur) / b.total) * 100);
+      }),
       timeout(1500).then(() => null),
     ]);
-    const m = txt && txt.match(/^(\d+)%/);
-    if (m && Number(m[1]) >= pct) return Number(m[1]);
+    if (txt !== null && txt >= pct) return txt;
     await timeout(250);
   }
   throw new Error(`bundle progress never reached ${pct}%`);
@@ -426,9 +417,10 @@ async function main() {
         if (!f.sha256) f.sha256 = await sha256File(f.path);
       }
       downloadPromise = receiver.waitForEvent('download', { timeout: 300000 });
-      await sender.setInputFiles('#transfer-select-file-input', zipFixtures.map((f) => f.path));
-      await receiver.click('#transfer-files-download');
-      await receiver.waitForSelector('#download-modal', { state: 'visible', timeout: 30000 });
+      await sender.setInputFiles('#file-input', zipFixtures.map((f) => f.path));
+      await receiver.waitForSelector('#download-all-btn', { state: 'visible', timeout: 30000 });
+      await receiver.click('#download-all-btn');
+      await receiver.waitForSelector('#bundle', { state: 'visible', timeout: 30000 });
       mark('download-all-started', { files: zipFixtures.map((f) => f.size) });
       const threshold = Math.ceil((small.size / (small.size + fixture.size)) * 100) + 5;
       const pct = await waitForModalProgress(receiver, threshold);

@@ -10,13 +10,11 @@ import { addDevBadge } from './devBadge.js';
 //
 // All sinks expose the same interface:
 //   const sink = await openSink({ id, name, size, mime })
-//   await sink.write(uint8Array)            // backpressured
+//   await sink.write(uint8Array)            // resolves once the bytes are stored
 //   await sink.close()                      // success
 //   await sink.abort(reason?)               // cleanup on failure / user abort
 //
 // `openSink` may throw or return null if the chosen mode is unsupported.
-
-const LARGE_FILE_THRESHOLD = 500 * 1024 * 1024; // 500 MB
 
 const SINK_MODES = ['auto', 'fs', 'sw', 'blob'];
 
@@ -93,7 +91,6 @@ export const sinkState = {
   auto: detectAuto(_initialAvailability), // what auto would pick right now
   serviceWorkerReady: false,              // set true once SW registration resolves
   serviceWorkerRegistration: null,
-  LARGE_FILE_THRESHOLD,
 };
 
 export function activeMode() {
@@ -183,7 +180,6 @@ async function openFsSink({ name, mime }) {
   return {
     mode: 'fs',
     async write(chunk) { await writable.write(chunk); },
-    async truncate0() { await writable.truncate(0); },
     async close() { await writable.close(); },
     async abort(reason) {
       try { await writable.abort(reason); } catch {}
@@ -250,7 +246,6 @@ async function openSwSink({ id, name, size, mime }) {
     if (!sw) throw new Error('Service Worker not available.');
 
     const channel = new MessageChannel();
-    let sinkRef = null;
     // Credit-gated flow control (protocol in sw.js); 'cancel' unblocks a waiting sender.
     let credits = 0;
     let cancelled = false;
@@ -269,7 +264,7 @@ async function openSwSink({ id, name, size, mime }) {
           // User cancelled the browser download — call this sink's onCancel hook (if any).
           cancelled = true;
           notify();
-          if (sinkRef && typeof sinkRef._onCancel === 'function') sinkRef._onCancel();
+          if (typeof sink._onCancel === 'function') sink._onCancel();
         }
       };
     });
@@ -299,7 +294,10 @@ async function openSwSink({ id, name, size, mime }) {
       for (;;) {
         const { value, done } = await reader.read();
         if (done) break;
-        if (!await waitForCredit()) { try { await reader.cancel(); } catch {} break; }
+        if (!await waitForCredit()) {
+          try { await reader.cancel(); } catch {}
+          throw new DOMException('The download was cancelled in the browser.', 'AbortError');
+        }
         const buf = value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength);
         port.postMessage(buf, [buf]);
       }
@@ -315,19 +313,19 @@ async function openSwSink({ id, name, size, mime }) {
     }
   };
 
-  return {
+  const sink = {
     mode: 'sw',
-    // Callers (user.downloadFile / user.downloadAll) assign a callback here so that a
+    // Callers (room.download / room.downloadAll) assign a callback here so that a
     // browser-side cancel aborts the transfer instead of leaving it running.
     _onCancel: null,
     async write(chunk) { await writable.write(chunk); },
-    async truncate0() { await writable.truncate(0); },
     async close() { await deliver(); },
     async abort(reason) {
       try { await writable.close(); } catch {}
       try { await root.removeEntry(stagingName); } catch {}
     },
   };
+  return sink;
 }
 
 // ---- Blob (legacy) sink -------------------------------------------------------------
@@ -340,7 +338,6 @@ function openBlobSink({ name, mime }) {
       // Copy into a stable Uint8Array reference (the caller may reuse the buffer).
       chunks.push(new Uint8Array(chunk));
     },
-    async truncate0() { chunks.length = 0; },
     async close() {
       const blob = new Blob(chunks, mime ? { type: mime } : undefined);
       chunks.length = 0;

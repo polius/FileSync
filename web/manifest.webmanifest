@@ -1,0 +1,12 @@
+{
+  "name": "FileSync",
+  "short_name": "FileSync",
+  "description": "Send files from one device to many, directly and privately.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f7f9",
+  "theme_color": "#f28c28",
+  "icons": [
+    { "src": "/assets/icon.png", "sizes": "264x264", "type": "image/png" }
+  ]
+}

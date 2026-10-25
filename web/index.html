@@ -1,422 +1,340 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>FileSync.app | Send files securely in real-time.</title>
-    <meta name="description" content="Send files securely from one device to many in real-time.">
-    <meta charset="UTF-8">
-    <link rel="icon" type="image/png" href="assets/icon.png">
-    <link rel="apple-touch-icon" href="assets/icon.png">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="css/bootstrap.min.css" rel="stylesheet">
-    <link href="css/style.css" rel="stylesheet">
-    <script src="js/theme.js"></script>
-  </head>
-  <body>
-    <div class="header">
-      <span id="theme-text" style="cursor:pointer">Dark</span>
-      <span style="padding-left: 5px; padding-right: 5px;">|</span>
-      <span id="about-text" style="cursor:pointer">About</span>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>FileSync · Send files to any device</title>
+  <meta name="description" content="Send files from one device to many, directly and privately, with no size limit and no accounts.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111418" media="(prefers-color-scheme: dark)">
+  <meta property="og:title" content="FileSync">
+  <meta property="og:description" content="Send files from one device to many, directly and privately.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="/assets/filesync.png?v=__APP_VERSION__">
+  <link rel="icon" type="image/png" href="/assets/icon.png?v=__APP_VERSION__">
+  <link rel="apple-touch-icon" href="/assets/icon.png?v=__APP_VERSION__">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="preload" href="/assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/css/app.css?v=__APP_VERSION__">
+  <link rel="modulepreload" href="/js/app/main.js">
+  <link rel="modulepreload" href="/js/app/room.js">
+  <link rel="modulepreload" href="/js/app/view.js">
+  <link rel="modulepreload" href="/js/app/net.js">
+  <link rel="modulepreload" href="/js/app/link.js">
+  <link rel="modulepreload" href="/js/app/signaling.js">
+  <link rel="modulepreload" href="/js/app/transfer.js">
+  <link rel="modulepreload" href="/js/app/protocol.js">
+  <link rel="modulepreload" href="/js/app/crypto.js">
+  <link rel="modulepreload" href="/js/app/util.js">
+  <script src="/js/theme.js?v=__APP_VERSION__"></script>
+  <script type="module" src="/js/app/main.js"></script>
+</head>
+<body>
+  <svg class="sprite" aria-hidden="true" focusable="false">
+    <symbol id="i-logo" viewBox="0 0 24 24"><path d="M2.5 9.5a14 14 0 0 1 19 0M5.5 12.8a9.5 9.5 0 0 1 13 0M8.6 16a5 5 0 0 1 6.8 0"/><circle cx="12" cy="19.2" r="1.3" class="fill"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.4l2 2.2h8.6A1.5 1.5 0 0 1 21 9.7v8.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3.5v11M8 7.5l4-4 4 4M6 11H5a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 5 20h14a1.5 1.5 0 0 0 1.5-1.5v-6A1.5 1.5 0 0 0 19 11h-1"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.5l7 2.6v5.4c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6.1z"/><path d="M8.8 12l2.2 2.2 4.2-4.4"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4l9 15.5H3z"/><path d="M12 10v4.2M12 17v.01"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 8v.01"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 19.5a7 7 0 0 1 14 0"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 4.2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 16.6l-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z"/></symbol>
+    <symbol id="i-auto" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" class="fill"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12l16-7.5L13.5 20l-2.3-6.2z"/><path d="M11.2 13.8L20 4.5"/></symbol>
+    <symbol id="i-retry" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4h-4"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="1.5"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l.8 12.5h9.4L17.5 7"/></symbol>
+    <symbol id="i-qr" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2.5v2.5H14zM17.5 17.5H20V20h-2.5zM17.5 14H20M14 20h1"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M15 5.5l3.5 3.5L9 18.5H5.5V15z"/></symbol>
+    <symbol id="i-message" viewBox="0 0 24 24"><path d="M5 5h14a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 17h-8l-4.5 3.5V17H5a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 5 5z"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4.5h5.5V10M19.5 4.5L11 13M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></symbol>
+  </svg>
+
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="topbar">
+    <a class="brand" href="/" id="brand" aria-label="FileSync home">
+      <span class="brand-mark"><svg class="icon"><use href="#i-logo"/></svg></span>
+      <span class="brand-name">FileSync</span>
+      <span class="version" id="version" hidden></span>
+    </a>
+    <nav class="topnav" aria-label="App">
+      <button type="button" class="btn ghost" id="theme-btn"><svg class="icon"><use href="#i-auto" id="theme-icon"/></svg><span id="theme-label">Auto</span></button>
+      <button type="button" class="btn ghost" id="about-btn" aria-label="About"><svg class="icon"><use href="#i-info"/></svg><span>About</span></button>
+      <button type="button" class="btn ghost" id="new-room-btn" aria-label="New room"><svg class="icon"><use href="#i-plus"/></svg><span>New room</span></button>
+    </nav>
+  </header>
+
+  <div class="banners">
+    <div class="banner warn" id="insecure-banner" hidden>
+      <svg class="icon"><use href="#i-alert"/></svg>
+      <p>This server uses plain HTTP, so large files are held in memory while they download. For large files, set up FileSync with HTTPS: see the <a href="https://github.com/polius/filesync#option-b--https-own-domain-recommended" target="_blank" rel="noopener">HTTPS guide</a>.</p>
+      <button type="button" class="btn icon-only ghost" id="insecure-close" aria-label="Dismiss"><svg class="icon"><use href="#i-x"/></svg></button>
     </div>
-    <div class="master-div" style="padding-top:3vh">
-      <div class="col-lg-7 mx-auto p-4" style="width:100%">
+    <div class="banner info" id="conn-banner" role="status" hidden>
+      <span class="spinner" aria-hidden="true"></span>
+      <p id="conn-banner-text">Reconnecting…</p>
+    </div>
+  </div>
 
-        <!-- HEADER-->
-        <div id="header-logo" class="row align-items-center head mb-4" style="cursor: pointer">
-          <div class="col col-auto">
-            <div class="icon d-inline-block">
-              <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="currentColor" class="bi bi-wifi" viewBox="0 0 16 16">
-                <path d="M15.384 6.115a.485.485 0 0 0-.047-.736A12.444 12.444 0 0 0 8 3C5.259 3 2.723 3.882.663 5.379a.485.485 0 0 0-.048.736.518.518 0 0 0 .668.05A11.448 11.448 0 0 1 8 4c2.507 0 4.827.802 6.716 2.164.205.148.49.13.668-.049z"/>
-                <path d="M13.229 8.271a.482.482 0 0 0-.063-.745A9.455 9.455 0 0 0 8 6c-1.905 0-3.68.56-5.166 1.526a.48.48 0 0 0-.063.745.525.525 0 0 0 .652.065A8.46 8.46 0 0 1 8 7a8.46 8.46 0 0 1 4.576 1.336c.206.132.48.108.653-.065zm-2.183 2.183c.226-.226.185-.605-.1-.75A6.473 6.473 0 0 0 8 9c-1.06 0-2.062.254-2.946.704-.285.145-.326.524-.1.75l.015.015c.16.16.407.19.611.09A5.478 5.478 0 0 1 8 10c.868 0 1.69.201 2.42.56.203.1.45.07.61-.091l.016-.015zM9.06 12.44c.196-.196.198-.52-.04-.66A1.99 1.99 0 0 0 8 11.5a1.99 1.99 0 0 0-1.02.28c-.238.14-.236.464-.04.66l.706.706a.5.5 0 0 0 .707 0l.707-.707z"/>
-              </svg>
-            </div>
-          </div>
-          <div class="col col-auto">
-            <h1 class="fw-semibold" style="font-family: Acme; font-size: 2.8rem; margin-bottom:0; display: inline-flex; align-items: baseline; gap: 12px;">FileSync<span class="app-version" id="appVersion"></span></h1>
-          </div>
-        </div>
-        <h2 class="fw-normal" style="margin:0; font-size: calc(1.05rem + 0.3vw); letter-spacing: -0.01em">Send files from one device to many in real-time.</h2>
+  <main id="main" class="page">
+    <noscript><section class="card panel"><h1>FileSync needs JavaScript</h1><p>Turn on JavaScript to send and receive files.</p></section></noscript>
 
-        <!-- ABOUT -->
-        <div id="about-div" class="p-4 box" style="margin-top:30px; display: none;">
-          <p style="font-size: 2rem; margin:0; font-family: Acme;">About</p>
-          <p style="font-size: 1rem; margin-top:10px; margin-bottom: 1.5rem;">Designed to work on any device, anywhere!</p>
-          <hr>
-          <p style="text-align: justify; text-justify: inter-word;"><span style="font-family: Acme; font-size: 1rem; color:rgb(252, 145, 45);">FileSync.app</span> is a file sharing web application that allows users to transfer files between multiple devices with end-to-end encryption.</p>
-          <p style="text-align: justify; text-justify: inter-word;">No account creation or signups are required. It enables both one-to-one and many-to-many file transfers, works across various networks and devices, and requires no app installation.</p>
-          <p style="font-size: 1.2rem; margin:0; margin-top:35px; margin-bottom:20px; font-family: Acme; font-size: 1.3rem; text-align:left; font-weight: 600;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#198754" class="bi bi-layers" viewBox="0 0 16 16" style="margin-bottom: 5px; margin-right: 6px;">
-              <path d="M8.235 1.559a.5.5 0 0 0-.47 0l-7.5 4a.5.5 0 0 0 0 .882L3.188 8 .264 9.559a.5.5 0 0 0 0 .882l7.5 4a.5.5 0 0 0 .47 0l7.5-4a.5.5 0 0 0 0-.882L12.813 8l2.922-1.559a.5.5 0 0 0 0-.882l-7.5-4zm3.515 7.008L14.438 10 8 13.433 1.562 10 4.25 8.567l3.515 1.874a.5.5 0 0 0 .47 0l3.515-1.874zM8 9.433 1.562 6 8 2.567 14.438 6 8 9.433z"/>
-            </svg>
-            Under the hood
-          </p>
-          <p style="text-align: justify; text-justify: inter-word;">FileSync uses <a href="https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API" target="_blank" style="text-decoration: none;">WebRTC</a> to transfer files between multiple devices. Files shared are peer-to-peer, which means there is a direct file transfer between the sender and receiver without any intermediate server. Your files remain private and secure throughout the entire transfer process.</p>
-          <p style="text-align: justify; text-justify: inter-word; margin-bottom: 20px">Do note that a lightweight signaling server is used to assist in the initial connection setup, ensuring all users can establish peer-to-peer connections effectively. Once the connections are established, the server steps back, allowing the direct transfer of files between the sender and the receiver. At no point during this process does the server have access to the file contents. It solely facilitates the connection between users without compromising the privacy or security of the files being shared.</p>
-          <img id="comic-img" src="assets/comic.png" title="File Transfer - https://xkcd.com/949" alt="File Transfer - https://xkcd.com/949" style="width:100%; max-width: 456px">
-          <p style="text-align:left; text-align: justify; text-justify: inter-word; margin-top:30px; margin-bottom:10px">Released under the MIT License.</p>
-          <p style="text-align:left; text-align: justify; text-justify: inter-word; margin:0"><a href="https://github.com/polius/filesync" target="_blank" style="text-decoration:none;">https://github.com/polius/filesync</a></p>
-        </div>
+    <!-- Joining a room -->
+    <section class="card panel center" id="joining" hidden aria-live="polite">
+      <span class="spinner large" aria-hidden="true"></span>
+      <h1 class="panel-title">Joining the room…</h1>
+      <p class="muted" id="joining-detail">Connecting directly to the person who shared the link.</p>
+    </section>
 
-        <!-- ERROR -->
-        <div id="error-div" class="p-4 box" style="margin-top:40px; color: #dc3545; font-size:16px; display: none">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-exclamation-circle-fill" viewBox="0 0 16 16" style="margin-bottom: 3px; margin-right:6px">
-            <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8 4a.905.905 0 0 0-.9.995l.35 3.507a.552.552 0 0 0 1.1 0l.35-3.507A.905.905 0 0 0 8 4zm.002 6a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/>
-          </svg>
-          <span id="error-message"></span>
-        </div>
-
-        <!-- CONNECTING TO HOST -->
-        <div id="connect-div" class="p-4 box" style="margin-top:40px; display: none">
-          <div class="spinner-border" style="color: #0d6efd; width: 1.1rem; height: 1.1rem; --bs-spinner-border-width: 0.1em; margin-bottom:-1px; margin-right:6px"></div>
-          <span style="color: var(--color-p); font-size:16px; font-weight:600">Connecting ...</span>
-        </div>
-
-        <!-- PASSWORD REQUIRED -->
-        <div id="password-div" class="p-4 box" style="margin-top:40px; display: none; max-width: 600px; margin-left:auto; margin-right:auto; text-align: left;">
-          <div id="password-alert" class="alert alert-danger alert-dismissible" role="alert" style="display: none;">
-            <div style="text-align:left">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-exclamation-triangle-fill" viewBox="0 0 16 16" style="margin-bottom:3px; margin-right:5px">
-                <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5m.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/>
-              </svg>
-              This password is not valid.
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-          </div>
-          <p>This room is protected with password.</p>
-          <div class="input-group mb-1">
-            <input id="password-input" class="form-control" type="password" placeholder="Enter a password" autocomplete="off" style="border-top-right-radius:0!important; border-bottom-right-radius:0!important">
-            <button id="password-input-toggle" class="btn" type="button" style="background-color: #212529; color:#fff; border-color: rgb(86, 92, 110); margin-left:-1px; border-top-left-radius: 0; border-bottom-left-radius: 0">
-              <svg id="password-hide" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-eye-slash-fill" viewBox="0 0 16 16" style="margin-bottom:0px!important; display:block;">
-                <path d="m10.79 12.912-1.614-1.615a3.5 3.5 0 0 1-4.474-4.474l-2.06-2.06C.938 6.278 0 8 0 8s3 5.5 8 5.5a7.029 7.029 0 0 0 2.79-.588zM5.21 3.088A7.028 7.028 0 0 1 8 2.5c5 0 8 5.5 8 5.5s-.939 1.721-2.641 3.238l-2.062-2.062a3.5 3.5 0 0 0-4.474-4.474L5.21 3.089z"/>
-                <path d="M5.525 7.646a2.5 2.5 0 0 0 2.829 2.829l-2.83-2.829zm4.95.708-2.829-2.83a2.5 2.5 0 0 1 2.829 2.829zm3.171 6-12-12 .708-.708 12 12-.708.708z"/>
-              </svg>
-              <svg id="password-show" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-eye-fill" viewBox="0 0 16 16" style="margin-bottom:0px!important; display:none">
-                <path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z"/>
-                <path d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8zm8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/>
-              </svg>
-            </button>
-          </div>
-          <div id="password-error" style="color: #dc3545; font-size: 0.9rem; font-weight: 300; display: none;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-exclamation-circle-fill" viewBox="0 0 16 16" style="margin-right: 5px; margin-bottom:3px">
-              <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M8 4a.905.905 0 0 0-.9.995l.35 3.507a.552.552 0 0 0 1.1 0l.35-3.507A.905.905 0 0 0 8 4m.002 6a1 1 0 1 0 0 2 1 1 0 0 0 0-2"/>
-            </svg>
-            This password is not valid.
-          </div>
-          <button id="password-submit" class="btn btn-primary" type="button" style="height:40px; width:100%; font-size: 1rem; border-radius: 5px; margin-top:15px">
-            <div id="password-loading" class="spinner-border" style="color: white; width: 0.9rem; height: 0.9rem; --bs-spinner-border-width: 0.1em; margin-bottom:1px; margin-right:5px; display: none;"></div>
-            Submit
-          </button>
-        </div>
-
-        <!-- TRANSFER DIV -->
-        <div id="transfer-div" class="p-4 box" style="margin-top:30px; display: none;">
-          <div class="row" style="text-align: left;">
-            <div class="col col-auto" style="margin-right:10px">
-              <canvas id="transfer-qr-code"></canvas>
-            </div>
-            <div class="col-md" style="padding-top:15px">
-
-              <span id="transfer-status-protected" style="display: none" title="Protected with password">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="#198754" class="bi bi-shield-shaded" viewBox="0 0 16 16" style="margin-right:5px; margin-bottom:3px">
-                  <path fill-rule="evenodd" d="M8 14.933a1 1 0 0 0 .1-.025q.114-.034.294-.118c.24-.113.547-.29.893-.533a10.7 10.7 0 0 0 2.287-2.233c1.527-1.997 2.807-5.031 2.253-9.188a.48.48 0 0 0-.328-.39c-.651-.213-1.75-.56-2.837-.855C9.552 1.29 8.531 1.067 8 1.067zM5.072.56C6.157.265 7.31 0 8 0s1.843.265 2.928.56c1.11.3 2.229.655 2.887.87a1.54 1.54 0 0 1 1.044 1.262c.596 4.477-.787 7.795-2.465 9.99a11.8 11.8 0 0 1-2.517 2.453 7 7 0 0 1-1.048.625c-.28.132-.581.24-.829.24s-.548-.108-.829-.24a7 7 0 0 1-1.048-.625 11.8 11.8 0 0 1-2.517-2.453C1.928 10.487.545 7.169 1.141 2.692A1.54 1.54 0 0 1 2.185 1.43 63 63 0 0 1 5.072.56"/>
-                </svg>
-              </span>
-
-              <span id="transfer-status-wait" style="color: var(--color-p); font-size:16px; font-weight:600; display: inline-block;">
-                <div class="spinner-border" style="color: #0d6efd; width: 1.1rem; height: 1.1rem; --bs-spinner-border-width: 0.1em; margin-bottom:-1px; margin-right:8px"></div>
-                Waiting for users to join...
-              </span>
-
-              <span id="transfer-status-success" style="font-size:17px; font-weight:600; color:#198754; display: none;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-lightning-charge-fill" viewBox="0 0 16 16" style="margin-bottom:5px; margin-right:3px">
-                  <path d="M11.251.068a.5.5 0 0 1 .227.58L9.677 6.5H13a.5.5 0 0 1 .364.843l-8 8.5a.5.5 0 0 1-.842-.49L6.323 9.5H3a.5.5 0 0 1-.364-.843l8-8.5a.5.5 0 0 1 .615-.09z"/>
-                </svg>
-                Connection established!
-              </span>
-
-              <p style="font-size:17px; margin-top:15px; margin-bottom:15px; font-weight:500">Share room link to devices you want to share files with.</p>
-
-              <div id="transfer-url-row" class="input-group flex-nowrap" style="margin-bottom: 5px; cursor: pointer;">
-                <span id="transfer-url-value" class="form-control" style="font-family: Consolas,monaco,monospace; font-size: 15px; padding-top:12px; padding-bottom:12px; text-decoration: none; word-wrap: break-word; color: var(--color-url)"></span>
-                <span id="transfer-url-copy" class="input-group-text" style="width: 48px; border-top-right-radius: 5px; border-bottom-right-radius: 5px;" title="Copy URL">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-copy" viewBox="0 0 16 16" style="margin-left:3px">
-                    <path fill-rule="evenodd" d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h1v1a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1v1z"/>
-                  </svg>
-                </span>
-                <span id="transfer-url-success" class="input-group-text" style="display: none; border-top-right-radius: 5px; border-bottom-right-radius: 5px;">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-check-lg" viewBox="0 0 16 16" style="margin-right: 2px;">
-                    <path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425z"/>
-                  </svg>
-                </span>
-              </div>
-
-              <div class="row">
-                <div class="col-auto" style="padding-right:0; padding-top:15px">
-                  <button id="transfer-select-file" class="btn btn-primary" type="button" style="height:50px; font-size: 1.05rem; border-radius: 100px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="white" class="bi bi-plus" viewBox="0 0 16 16" style="margin-left:3px; margin-bottom: 2px">
-                      <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
-                    </svg>
-                    <span style="margin-right: 10px;">Send Files</span>
-                  </button>
-                  <input id="transfer-select-file-input" type="file" multiple style="display: none"/>
-                </div>
-                <div id="transfer-add-password" class="col col-auto" style="padding-top:15px; display: none;">
-                  <button id="transfer-add-password-btn" class="btn btn-success" type="button" style="height:50px; font-size: 1.05rem; border-radius: 100px">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" class="bi bi-shield-shaded" viewBox="0 0 16 16" style="margin-left:10px; margin-right:5px; margin-bottom:3px">
-                      <path fill-rule="evenodd" d="M8 14.933a1 1 0 0 0 .1-.025q.114-.034.294-.118c.24-.113.547-.29.893-.533a10.7 10.7 0 0 0 2.287-2.233c1.527-1.997 2.807-5.031 2.253-9.188a.48.48 0 0 0-.328-.39c-.651-.213-1.75-.56-2.837-.855C9.552 1.29 8.531 1.067 8 1.067zM5.072.56C6.157.265 7.31 0 8 0s1.843.265 2.928.56c1.11.3 2.229.655 2.887.87a1.54 1.54 0 0 1 1.044 1.262c.596 4.477-.787 7.795-2.465 9.99a11.8 11.8 0 0 1-2.517 2.453 7 7 0 0 1-1.048.625c-.28.132-.581.24-.829.24s-.548-.108-.829-.24a7 7 0 0 1-1.048-.625 11.8 11.8 0 0 1-2.517-2.453C1.928 10.487.545 7.169 1.141 2.692A1.54 1.54 0 0 1 2.185 1.43 63 63 0 0 1 5.072.56"/>
-                    </svg>
-                    <span style="margin-right: 10px;">Add password</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div id="transfer-users-div" class="card" style="width:100%; margin-top:20px">
-            <div class="card-header">
-              <div class="row align-items-center">
-                <div class="col col-1-3"></div>
-                <div class="col col-2-3">
-                  Users
-                  <span id="transfer-users-count"> (0)</span>
-                </div>
-                <div class="col col-3-3" style="text-align: right">
-                  <span id="transfer-users-change-name" title="Change your name" class="card-header-action">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-person-circle" viewBox="0 0 16 16" style="margin-bottom: 2px; margin-right: 4px">
-                      <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0"/>
-                      <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8m8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1"/>
-                    </svg>
-                    Change name
-                  </span>
-                </div>
-              </div>
-            </div>
-            <ul id="transfer-users-list" class="list-group list-group-flush">
-              <li id="transfer-users-list-host" class="list-group-item">
-                <span title="Host">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#ffa651" class="bi bi-star-fill" viewBox="0 0 16 16" style="margin-bottom: 5px; margin-right: 2px">
-                    <path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.522 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187l-4.389 2.256z"/>
-                  </svg>
-                </span>
-                <span id="transfer-users-list-host-name"></span>
-              </li>
-            </ul>
-          </div>
-
-          <div id="transfer-files-div" class="card" style="width:100%; margin-top:15px">
-            <div class="card-header">
-              <div class="row align-items-center">
-                <div class="col col-1-3"></div>
-                <div class="col col-2-3">
-                  Files
-                  <span id="transfer-files-count"> (0)</span>
-                </div>
-                <div class="col col-3-3" style="text-align: right">
-                  <span id="transfer-files-download" title="Download all files" class="card-header-action">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cloud-arrow-down-fill" viewBox="0 0 16 16" style="margin-right:4px; margin-bottom:2px">
-                      <path d="M8 2a5.53 5.53 0 0 0-3.594 1.342c-.766.66-1.321 1.52-1.464 2.383C1.266 6.095 0 7.555 0 9.318 0 11.366 1.708 13 3.781 13h8.906C14.502 13 16 11.57 16 9.773c0-1.636-1.242-2.969-2.834-3.194C12.923 3.999 10.69 2 8 2m2.354 6.854-2 2a.5.5 0 0 1-.708 0l-2-2a.5.5 0 1 1 .708-.708L7.5 9.293V5.5a.5.5 0 0 1 1 0v3.793l1.146-1.147a.5.5 0 0 1 .708.708"/>
-                    </svg>
-                    Download all
-                  </span>
-                </div>
-              </div>
-            </div>
-            <ul id="transfer-files-list" class="list-group list-group-flush">
-              <li id="transfer-files-list-empty" class="list-group-item" style="font-size: 15px;">No files transferred</li>
-            </ul>
+    <!-- Password -->
+    <section class="card panel" id="password-panel" hidden>
+      <form id="password-form" class="stack" novalidate>
+        <div class="panel-head">
+          <span class="panel-icon"><svg class="icon"><use href="#i-lock"/></svg></span>
+          <div>
+            <h1 class="panel-title">This room has a password</h1>
+            <p class="muted">Ask the person who shared the link for it.</p>
           </div>
         </div>
+        <label class="field">
+          <span class="label">Password</span>
+          <span class="input-row">
+            <input type="password" id="password-input" autocomplete="current-password" required>
+            <button type="button" class="btn ghost" id="password-reveal" aria-pressed="false">Show</button>
+          </span>
+        </label>
+        <p class="field-error" id="password-error" role="alert" hidden></p>
+        <button type="submit" class="btn primary block" id="password-submit"><span class="spinner" aria-hidden="true" hidden id="password-spinner"></span><span>Join room</span></button>
+      </form>
+    </section>
 
-        <!-- ADD PASSWORD MODAL -->
-        <div id="password-modal" class="modal fade" tabindex="-1" style="text-align: left;">
-          <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-              <div class="modal-header">
-                <h5 style="color: var(--color-h1); margin:0">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="#198754" class="bi bi-shield-shaded" viewBox="0 0 16 16" style="margin-right:5px; margin-bottom:4px">
-                    <path fill-rule="evenodd" d="M8 14.933a1 1 0 0 0 .1-.025q.114-.034.294-.118c.24-.113.547-.29.893-.533a10.7 10.7 0 0 0 2.287-2.233c1.527-1.997 2.807-5.031 2.253-9.188a.48.48 0 0 0-.328-.39c-.651-.213-1.75-.56-2.837-.855C9.552 1.29 8.531 1.067 8 1.067zM5.072.56C6.157.265 7.31 0 8 0s1.843.265 2.928.56c1.11.3 2.229.655 2.887.87a1.54 1.54 0 0 1 1.044 1.262c.596 4.477-.787 7.795-2.465 9.99a11.8 11.8 0 0 1-2.517 2.453 7 7 0 0 1-1.048.625c-.28.132-.581.24-.829.24s-.548-.108-.829-.24a7 7 0 0 1-1.048-.625 11.8 11.8 0 0 1-2.517-2.453C1.928 10.487.545 7.169 1.141 2.692A1.54 1.54 0 0 1 2.185 1.43 63 63 0 0 1 5.072.56"/>
-                  </svg>
-                  Add password
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-              </div>
-              <div class="modal-body">
-                <label class="mb-1" for="password">Password</label>
-                <div class="input-group mb-2">
-                  <input id="password-modal-value" class="form-control" type="password" placeholder="Enter a password" autocomplete="off" style="border-top-right-radius:0!important; border-bottom-right-radius:0!important">
-                  <button id="password-modal-toggle" class="btn" type="button" style="background-color: #212529; color:#fff; border-color: rgb(86, 92, 110); margin-left:-1px; border-top-left-radius: 0; border-bottom-left-radius: 0">
-                    <svg id="password-button-hide" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-eye-slash-fill" viewBox="0 0 16 16" style="margin-bottom:0px!important; display:block;">
-                      <path d="m10.79 12.912-1.614-1.615a3.5 3.5 0 0 1-4.474-4.474l-2.06-2.06C.938 6.278 0 8 0 8s3 5.5 8 5.5a7.029 7.029 0 0 0 2.79-.588zM5.21 3.088A7.028 7.028 0 0 1 8 2.5c5 0 8 5.5 8 5.5s-.939 1.721-2.641 3.238l-2.062-2.062a3.5 3.5 0 0 0-4.474-4.474L5.21 3.089z"/>
-                      <path d="M5.525 7.646a2.5 2.5 0 0 0 2.829 2.829l-2.83-2.829zm4.95.708-2.829-2.83a2.5 2.5 0 0 1 2.829 2.829zm3.171 6-12-12 .708-.708 12 12-.708.708z"/>
-                    </svg>
-                    <svg id="password-button-show" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-eye-fill" viewBox="0 0 16 16" style="margin-bottom:0px!important; display:none">
-                      <path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z"/>
-                      <path d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8zm8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-              <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button id="password-modal-confirm" type="button" class="btn btn-primary">
-                  <span id="modalLoading" class="spinner-border spinner-border-sm" style="display:none; width:15px; height:15px; border-width:2px; margin-right:5px" aria-hidden="true"></span>
-                  Confirm
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- CHANGE NAME MODAL -->
-        <div id="name-modal" class="modal fade" tabindex="-1" style="text-align: left;">
-          <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-              <div class="modal-header">
-                <h5 style="color: var(--color-h1); margin:0">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="#FC912D" class="bi bi-person-circle" viewBox="0 0 16 16" style="margin-bottom:4px; margin-right:8px">
-                    <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0"/>
-                    <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8m8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1"/>
-                  </svg>
-                  Change name
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-              </div>
-              <div class="modal-body">
-                <label class="mb-1" for="name">New name</label>
-                <input id="name-modal-value" class="form-control" placeholder="Enter your new name" autocomplete="off" style="border-top-right-radius:0!important; border-bottom-right-radius:0!important">
-              </div>
-              <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button id="name-modal-confirm" type="button" class="btn btn-primary">Confirm</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- FILE DETAILS MODAL -->
-        <div id="file-modal" class="modal fade" tabindex="-1" style="text-align: left;">
-          <div class="modal-dialog modal-dialog-centered modal-lg" style="max-width:600px">
-            <div class="modal-content">
-              <div class="modal-header">
-                <h5 style="color: var(--color-h1); margin:0">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="#FC912D" class="bi bi-cloud-arrow-down-fill" viewBox="0 0 16 16" style="margin-bottom:3px; margin-right:8px">
-                    <path d="M8 2a5.53 5.53 0 0 0-3.594 1.342c-.766.66-1.321 1.52-1.464 2.383C1.266 6.095 0 7.555 0 9.318 0 11.366 1.708 13 3.781 13h8.906C14.502 13 16 11.57 16 9.773c0-1.636-1.242-2.969-2.834-3.194C12.923 3.999 10.69 2 8 2m2.354 6.854-2 2a.5.5 0 0 1-.708 0l-2-2a.5.5 0 1 1 .708-.708L7.5 9.293V5.5a.5.5 0 0 1 1 0v3.793l1.146-1.147a.5.5 0 0 1 .708.708"/>
-                  </svg>
-                  Details
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-              </div>
-              <div class="modal-body">
-                <div id="file-modal-table-empty" style="margin-bottom: 15px; display: none; color: var(--color-muted); text-align:center; padding: 20px 0;">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" class="bi bi-people" viewBox="0 0 16 16" style="margin-bottom:10px; opacity:0.5">
-                    <path d="M15 14s1 0 1-1-1-4-5-4-5 3-5 4 1 1 1 1zm-7.978-1L7 12.996c.001-.264.167-1.03.76-1.72C8.312 10.629 9.282 10 11 10c1.717 0 2.687.63 3.24 1.276.593.69.758 1.457.76 1.72l-.008.002-.014.002zM11 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4m3-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0M6.936 9.28a6 6 0 0 0-1.23-.247A7 7 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216A2.24 2.24 0 0 1 5 13c0-.25.006-.988.256-1.816.247-.823.695-1.678 1.442-2.345.088-.08.178-.154.27-.224zM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5"/>
-                  </svg>
-                  <p style="margin:0; font-size: 14px;">This file has not been downloaded by any users.</p>
-                </div>
-                <div id="file-modal-table-wrap" style="display: none; margin-bottom: 20px; border: 1px solid var(--color-border); border-radius: 10px; overflow: hidden;">
-                  <table id="file-modal-table" class="table table-hover" style="margin-bottom: 0;">
-                    <thead>
-                      <tr>
-                        <th scope="col">User</th>
-                        <th scope="col">Progress</th>
-                        <th scope="col">Status</th>
-                        <th scope="col" style="text-align:center;">Online</th>
-                      </tr>
-                    </thead>
-                    <tbody></tbody>
-                  </table>
-                </div>
-                <div style="text-align:right">
-                  <button id="file-modal-refresh" type="button" class="btn btn-secondary" style="margin-right:5px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-arrow-clockwise" viewBox="0 0 16 16" style="margin-right:5px; margin-bottom:2px">
-                      <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
-                      <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/>
-                    </svg>
-                    Refresh
-                  </button>
-                  <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- DOWNLOAD ALL MODAL -->
-        <div id="download-modal" class="modal fade" tabindex="-1" style="text-align: left;">
-          <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-              <div class="modal-header">
-                <h5 style="color: var(--color-h1); margin:0">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="#FC912D" class="bi bi-cloud-arrow-down-fill" viewBox="0 0 16 16" style="margin-bottom:3px; margin-right:8px">
-                    <path d="M8 2a5.53 5.53 0 0 0-3.594 1.342c-.766.66-1.321 1.52-1.464 2.383C1.266 6.095 0 7.555 0 9.318 0 11.366 1.708 13 3.781 13h8.906C14.502 13 16 11.57 16 9.773c0-1.636-1.242-2.969-2.834-3.194C12.923 3.999 10.69 2 8 2m2.354 6.854-2 2a.5.5 0 0 1-.708 0l-2-2a.5.5 0 1 1 .708-.708L7.5 9.293V5.5a.5.5 0 0 1 1 0v3.793l1.146-1.147a.5.5 0 0 1 .708.708"/>
-                  </svg>
-                  Download all
-                </h5>
-              </div>
-              <div class="modal-body">
-                <p style="margin-bottom:10px">
-                  Progress:
-                  <span id="download-modal-value" style="font-weight: 600; margin-left:2px; color: #FC912D;">0%</span>
-                </p>
-                <div id="download-modal-active" class="progress" role="progressbar" style="height: 20px">
-                  <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
-                </div>
-                <div id="download-modal-success" class="progress" role="progressbar" style="height: 20px; display: none;">
-                  <div class="progress-bar bg-success" style="width: 100%"></div>
-                </div>
-                <div id="download-modal-error" style="display: none;">
-                  <div class="progress" role="progressbar" style="height: 20px">
-                    <div class="progress-bar bg-danger" style="width: 0%"></div>
-                  </div>
-                  <p class="mt-2" style="color: #dc3545; font-size: 0.9rem; font-weight: 300; margin-bottom:0; display: block;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-exclamation-circle-fill" viewBox="0 0 16 16" style="margin-right: 5px; margin-bottom:3px">
-                      <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M8 4a.905.905 0 0 0-.9.995l.35 3.507a.552.552 0 0 0 1.1 0l.35-3.507A.905.905 0 0 0 8 4m.002 6a1 1 0 1 0 0 2 1 1 0 0 0 0-2"/>
-                    </svg>
-                    A user either removed a file being downloaded or closed the connection.
-                  </p>
-                </div>
-              </div>
-              <div class="modal-footer">
-                <button id="download-modal-cancel" type="button" class="btn btn-danger">
-                  <div id="download-modal-cancel-spinner" class="spinner-border" style="color: var(--color-h1); width: 1.1rem; height: 1.1rem; --bs-spinner-border-width: 0.1em; margin-bottom:-1px; margin-right:6px; display: none;"></div>
-                  Cancel
-                </button>
-                <button id="download-modal-close" type="button" class="btn btn-primary" data-bs-dismiss="modal" style="display: none;">Close</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- NOTIFICATION TOAST -->
-        <div id="notification-toast" style="position:fixed; top:20px; left:50%; transform:translateX(-50%) translateY(-100px); z-index:9999; pointer-events:none; opacity:0; transition: transform 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.35s ease;">
-          <div style="display:flex; align-items:center; gap:10px; padding:12px 22px; border-radius:12px; background-color:var(--color-box-bg); border:1px solid var(--color-border); box-shadow:var(--shadow-lg); pointer-events:auto;">
-            <svg id="notification-toast-icon-success" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="#198754" viewBox="0 0 16 16" style="flex-shrink:0;">
-              <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
-            </svg>
-            <svg id="notification-toast-icon-warning" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="#ffc107" viewBox="0 0 16 16" style="flex-shrink:0; display:none;">
-              <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
-            </svg>
-            <span id="notification-toast-value" style="font-size:14px; font-weight:500; color:var(--color-h1); white-space:nowrap;"></span>
-          </div>
-        </div>
-
-        <!-- Keep hidden modal for Bootstrap API compatibility -->
-        <div id="notification-modal" class="modal" tabindex="-1" style="display:none !important;"></div>
-        <p id="notification-modal-value" style="display:none !important;"></p>
-
-        <!-- FOOTER -->
-        <div id="footer" class="mx-auto pt-4 text-md-center">
-          <p class="fw-normal" style="margin:0;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-lock-fill" viewBox="0 0 16 16" style="margin-bottom:2px; margin-right:4px; opacity:0.6">
-              <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2m3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2"/>
-            </svg>
-            End-to-end encrypted · Your files stay private and secure.
-          </p>
+    <!-- Error -->
+    <section class="card panel" id="error-panel" hidden>
+      <div class="panel-head">
+        <span class="panel-icon danger"><svg class="icon"><use href="#i-alert"/></svg></span>
+        <div>
+          <h1 class="panel-title" id="error-title"></h1>
+          <p class="muted" id="error-detail"></p>
         </div>
       </div>
-    </div>
+      <div class="actions">
+        <button type="button" class="btn primary" id="error-retry"><svg class="icon"><use href="#i-retry"/></svg><span>Try again</span></button>
+        <a class="btn" href="/"><svg class="icon"><use href="#i-plus"/></svg><span>Start a new room</span></a>
+        <a class="btn ghost" href="/test.html">Check my connection</a>
+      </div>
+    </section>
 
-    <script src="js/vendors/bootstrap.bundle.min.js"></script>
-    <script src="js/vendors/qrious.min.js"></script>
-    <script type="module" src="js/modules/script.js"></script>
-  </body>
+    <!-- The room -->
+    <div class="room" id="room" hidden>
+      <section class="card share" aria-labelledby="share-title">
+        <details class="qr-box" id="qr-box">
+          <summary class="btn ghost qr-toggle"><svg class="icon"><use href="#i-qr"/></svg><span>QR code</span><svg class="icon chev"><use href="#i-chevron"/></svg></summary>
+          <div class="qr-tile"><canvas id="qr" width="232" height="232" role="img" aria-label="QR code for the room link"></canvas></div>
+        </details>
+        <div class="share-main">
+          <p class="status" id="status" role="status"><span class="dot" id="status-dot"></span><span id="status-text">Starting…</span></p>
+          <h1 class="share-title" id="share-title">Share this link with the devices you want to send files to</h1>
+          <div class="link-row">
+            <label class="visually-hidden" for="share-link">Room link</label>
+            <input id="share-link" class="link-field" type="text" readonly spellcheck="false">
+            <button type="button" class="btn" id="copy-btn"><svg class="icon"><use href="#i-copy" id="copy-icon"/></svg><span id="copy-label">Copy</span></button>
+            <button type="button" class="btn" id="share-btn" hidden><svg class="icon"><use href="#i-share"/></svg><span>Share</span></button>
+          </div>
+          <div class="share-meta">
+            <p class="badge" id="verify-badge" hidden></p>
+            <p class="badge" id="password-badge" hidden><svg class="icon"><use href="#i-lock"/></svg><span>Password protected</span></p>
+            <button type="button" class="btn link-btn" id="password-btn" hidden>Add a password</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card send" aria-label="Send">
+        <div class="send-actions">
+          <button type="button" class="btn primary big" id="send-files-btn"><svg class="icon"><use href="#i-plus"/></svg><span>Send files</span></button>
+          <button type="button" class="btn big" id="send-folder-btn"><svg class="icon"><use href="#i-folder"/></svg><span>Send a folder</span></button>
+          <input type="file" id="file-input" multiple hidden>
+          <input type="file" id="folder-input" webkitdirectory multiple hidden>
+        </div>
+        <p class="hint muted">Or drop files anywhere on this page, or paste them.</p>
+      </section>
+
+      <section class="card" aria-labelledby="people-title">
+        <header class="card-head">
+          <h2 id="people-title">People <span class="count" id="people-count"></span></h2>
+          <button type="button" class="btn ghost small" id="rename-btn"><svg class="icon"><use href="#i-pencil"/></svg><span>Change my name</span></button>
+        </header>
+        <ul class="people" id="people"></ul>
+        <p class="empty muted" id="people-empty">Nobody else is here yet. When someone opens the link, they’ll appear here.</p>
+      </section>
+
+      <section class="card" aria-labelledby="files-title">
+        <header class="card-head">
+          <h2 id="files-title">Files <span class="count" id="files-count"></span></h2>
+          <button type="button" class="btn small" id="download-all-btn" hidden><svg class="icon"><use href="#i-download"/></svg><span id="download-all-label">Download all</span></button>
+        </header>
+        <div class="bundle" id="bundle" hidden>
+          <div class="bundle-text">
+            <p class="bundle-title" id="bundle-title"></p>
+            <p class="muted small-text" id="bundle-detail"></p>
+          </div>
+          <div class="bar" id="bundle-bar"><span></span></div>
+          <button type="button" class="btn small" id="bundle-action">Cancel</button>
+        </div>
+        <ul class="files" id="files"></ul>
+        <p class="empty muted" id="files-empty">No files yet. Files you send, and files others send, show up here.</p>
+      </section>
+
+      <section class="card" aria-labelledby="texts-title">
+        <header class="card-head">
+          <h2 id="texts-title">Messages <span class="count" id="texts-count"></span></h2>
+        </header>
+        <form class="composer" id="text-form">
+          <label class="visually-hidden" for="text-input">Message or link to send</label>
+          <textarea id="text-input" rows="2" maxlength="10000" placeholder="Send a link, a code or a note to everyone in the room"></textarea>
+          <button type="submit" class="btn primary" id="text-send"><svg class="icon"><use href="#i-send"/></svg><span>Send</span></button>
+        </form>
+        <ul class="texts" id="texts"></ul>
+      </section>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <p><svg class="icon"><use href="#i-lock"/></svg> Files go straight between devices, encrypted in transit. Nothing is stored on the server.</p>
+  </footer>
+
+  <div class="drop-overlay" id="drop-overlay" hidden>
+    <div class="drop-target"><svg class="icon"><use href="#i-download"/></svg><p>Drop to send to everyone in the room</p></div>
+  </div>
+
+  <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
+
+  <!-- Dialogs -->
+  <dialog id="about-dialog" class="dialog wide" aria-labelledby="about-title">
+    <form method="dialog" class="dialog-body">
+      <header class="dialog-head">
+        <h2 id="about-title">About FileSync</h2>
+        <button class="btn icon-only ghost" value="close" aria-label="Close"><svg class="icon"><use href="#i-x"/></svg></button>
+      </header>
+      <div class="prose">
+        <p>FileSync sends files from one device to many in real time. Open a room, share the link or QR code, and anyone who joins can send and receive files. No accounts, no installs, and no size limit.</p>
+        <h3>How it works</h3>
+        <p>Files travel directly between browsers over WebRTC, encrypted in transit. The server only helps devices find each other. When a direct path isn’t possible, an encrypted relay passes the data along without being able to read it.</p>
+        <p>Links shared from the room include a security key after the <code>#</code>. Browsers never send that part to any server. When you join with it, FileSync confirms that nobody, not even the server, is sitting between you and the host, and shows <strong>Verified</strong>. A room code typed by hand still works, without that check.</p>
+        <p>Every file is checked with SHA-256 when it arrives, and interrupted transfers continue from where they stopped.</p>
+        <figure class="comic">
+          <img id="comic" src="/assets/comic.png?v=__APP_VERSION__" width="456" height="616" loading="lazy" alt="xkcd comic: sending a file in 2011 still means emailing, FTP or a USB stick, and early adopters are still figuring it out.">
+          <figcaption><a href="https://xkcd.com/949" target="_blank" rel="noopener">“File Transfer”</a> by Randall Munroe, xkcd, <a href="https://creativecommons.org/licenses/by-nc/2.5/" target="_blank" rel="noopener">CC BY-NC 2.5</a>.</figcaption>
+        </figure>
+        <p class="muted">Open source under the MIT License. <a href="https://github.com/polius/filesync" target="_blank" rel="noopener">Source code on GitHub</a> · <a href="/test.html">Connection check</a></p>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="rename-dialog" class="dialog" aria-labelledby="rename-title">
+    <form method="dialog" class="dialog-body" id="rename-form">
+      <header class="dialog-head">
+        <h2 id="rename-title">Change your name</h2>
+        <button class="btn icon-only ghost" value="cancel" formnovalidate aria-label="Close"><svg class="icon"><use href="#i-x"/></svg></button>
+      </header>
+      <label class="field">
+        <span class="label">Name others see</span>
+        <input id="rename-input" type="text" maxlength="60" autocomplete="nickname" required>
+      </label>
+      <p class="field-error" id="rename-error" role="alert" hidden></p>
+      <footer class="dialog-foot">
+        <button class="btn" value="cancel" formnovalidate>Cancel</button>
+        <button class="btn primary" value="ok" id="rename-ok">Save</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="password-dialog" class="dialog" aria-labelledby="password-dialog-title">
+    <form method="dialog" class="dialog-body" id="set-password-form">
+      <header class="dialog-head">
+        <h2 id="password-dialog-title">Room password</h2>
+        <button class="btn icon-only ghost" value="cancel" formnovalidate aria-label="Close"><svg class="icon"><use href="#i-x"/></svg></button>
+      </header>
+      <p class="muted">People who join after this need the password. Anyone already here stays.</p>
+      <label class="field">
+        <span class="label">Password</span>
+        <span class="input-row">
+          <input id="set-password-input" type="password" autocomplete="new-password" minlength="1">
+          <button type="button" class="btn ghost" id="set-password-reveal" aria-pressed="false">Show</button>
+        </span>
+      </label>
+      <footer class="dialog-foot">
+        <button class="btn danger-text" value="remove" id="password-remove" formnovalidate hidden>Remove password</button>
+        <span class="spacer"></span>
+        <button class="btn" value="cancel" formnovalidate>Cancel</button>
+        <button class="btn primary" value="ok">Save</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="confirm-dialog" class="dialog" aria-labelledby="confirm-title">
+    <form method="dialog" class="dialog-body">
+      <header class="dialog-head"><h2 id="confirm-title"></h2></header>
+      <p class="muted" id="confirm-text"></p>
+      <footer class="dialog-foot">
+        <button class="btn" value="cancel">Stay</button>
+        <button class="btn primary" value="ok" id="confirm-ok"></button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- Row templates -->
+  <template id="person-tpl">
+    <li class="person">
+      <span class="avatar" aria-hidden="true"></span>
+      <span class="person-name"></span>
+      <span class="tag host-tag" hidden><svg class="icon"><use href="#i-star"/></svg>Host</span>
+      <span class="tag me-tag" hidden>You</span>
+      <span class="tag verified-tag" hidden><svg class="icon"><use href="#i-shield"/></svg>Verified</span>
+    </li>
+  </template>
+
+  <template id="file-tpl">
+    <li class="file">
+      <span class="file-thumb" aria-hidden="true"><img alt="" hidden><span class="file-ext"></span></span>
+      <div class="file-main">
+        <p class="file-name"><span class="file-path"></span><span class="file-base"></span></p>
+        <p class="file-meta"></p>
+        <div class="bar" hidden><span></span></div>
+        <p class="file-note" hidden></p>
+        <details class="receivers" hidden><summary></summary><ul></ul></details>
+      </div>
+      <div class="file-actions">
+        <span class="done-mark" hidden><svg class="icon"><use href="#i-check"/></svg></span>
+        <button type="button" class="btn small" data-act="download" hidden><svg class="icon"><use href="#i-download"/></svg><span>Download</span></button>
+        <button type="button" class="btn small" data-act="resume" hidden><svg class="icon"><use href="#i-play"/></svg><span>Resume</span></button>
+        <button type="button" class="btn small" data-act="retry" hidden><svg class="icon"><use href="#i-retry"/></svg><span>Try again</span></button>
+        <button type="button" class="btn small" data-act="cancel" hidden><svg class="icon"><use href="#i-stop"/></svg><span>Stop</span></button>
+        <button type="button" class="btn small ghost" data-act="remove" hidden><svg class="icon"><use href="#i-trash"/></svg><span>Stop sharing</span></button>
+      </div>
+    </li>
+  </template>
+
+  <template id="text-tpl">
+    <li class="text">
+      <p class="text-meta"><span class="text-from"></span> · <time></time></p>
+      <p class="text-body"></p>
+      <div class="text-actions">
+        <button type="button" class="btn small ghost" data-act="copy-text"><svg class="icon"><use href="#i-copy"/></svg><span>Copy</span></button>
+        <a class="btn small ghost" data-act="open" target="_blank" rel="noopener noreferrer" hidden><svg class="icon"><use href="#i-external"/></svg><span>Open link</span></a>
+      </div>
+    </li>
+  </template>
+</body>
 </html>
