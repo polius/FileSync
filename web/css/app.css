@@ -218,12 +218,12 @@ textarea { resize: none; display: block; }
 .pill-btn.success { background: var(--success); }
 .pill-btn.success:hover { background: var(--success-hover); box-shadow: 0 4px 12px rgba(25, 135, 84, 0.3); }
 .pill-btn.secondary { background: var(--surface-head); color: var(--text); border: 1px solid var(--border); }
-/* A vivid orange between Open Color orange 7 and Bootstrap's orange, at the blue and green
-   pills' visual weight. White on it is 2.8:1: below AA for body text, chosen for the look. */
-.pill-btn.brand { background: #fb7611; }
-.pill-btn.brand:hover { background: #f76707; box-shadow: 0 4px 12px rgba(251, 118, 17, 0.35); }
-.pill-btn.brand .icon { width: 17px; height: 17px; }
-.pill-btn.brand .badge { background: #fff; color: #c2410c; }
+/* Open Color orange 9: orange without outshining the blue and green pills. White on it is
+   4.3:1, just under AA for body text. */
+.pill-btn.accent { background: #d9480f; }
+.pill-btn.accent:hover { background: #c23d0b; box-shadow: 0 4px 12px rgba(217, 72, 15, 0.35); }
+.pill-btn.accent .icon { width: 17px; height: 17px; }
+.pill-btn.accent .badge { background: #fff; color: #c23d0b; }
 .badge { display: inline-grid; place-items: center; min-width: 22px; height: 22px; margin-right: -8px; padding: 0 6px; border-radius: 11px; background: var(--danger); color: #fff; font: 700 12px/1 var(--font); font-variant-numeric: tabular-nums; }
 .pill-btn.secondary:hover { color: var(--strong); }
 
@@ -279,6 +279,7 @@ textarea { resize: none; display: block; }
 .share-title { font-size: 17px; font-weight: 500; line-height: 1.5; color: var(--text); }
 .link-field { font-family: var(--mono) !important; color: var(--url) !important; padding-top: 12px !important; padding-bottom: 12px !important; text-overflow: ellipsis; }
 .send-actions { display: flex; flex-wrap: wrap; gap: 12px; padding-top: 2px; }
+.label-short { display: none; }
 .hint { margin-top: -3px; font-size: 13px; color: var(--muted); }
 
 /* ---- Cards (v1 Bootstrap cards: centered header, action on the right) -------------- */
@@ -371,8 +372,9 @@ textarea { resize: none; display: block; }
 /* ---- Footer, overlay, toasts, dialogs -------------------------------------------- */
 
 .footer { padding: 28px 0 0; text-align: center; }
-.footer p { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); }
-.footer .icon { width: 13px; height: 13px; }
+.footer p { font-size: 13px; color: var(--muted); text-wrap: balance; }
+/* Inline with the text, so it stays beside the first word when the line wraps. */
+.footer .icon { width: 13px; height: 13px; margin-right: 7px; vertical-align: -1px; }
 
 .drop-overlay { position: fixed; inset: 0; z-index: 150; background: color-mix(in srgb, var(--bg) 80%, transparent); backdrop-filter: blur(2px); display: grid; place-items: center; padding: 24px; }
 .drop-target { display: grid; justify-items: center; gap: 12px; padding: 48px 40px; border: 2px dashed var(--primary); border-radius: var(--radius); background: var(--surface); color: var(--url); font-weight: 600; font-size: 17px; text-align: center; box-shadow: var(--shadow-lg); }
@@ -416,9 +418,21 @@ textarea { resize: none; display: block; }
   .person { grid-template-columns: minmax(0, 1fr) auto; }
   .person > .side:first-child { display: none; }
 }
+/* Where the buttons no longer fit on one line (phones, and tablets beside the QR code), Send
+   Files gets its own row and Password and Messages share the one below. */
+@media (max-width: 899px) {
+  .send-actions { gap: 8px; }
+  .send-actions .pill-btn { position: relative; flex: 1 1 0; height: 46px; padding: 0 12px; font-size: 0.95rem; }
+  .send-actions .pill-btn.primary { flex-basis: 100%; }
+  /* The unread count moves to the corner, like an app icon's. */
+  .send-actions .badge { position: absolute; top: -7px; right: -2px; min-width: 20px; height: 20px; margin: 0; padding: 0 5px; font-size: 11px; box-shadow: 0 0 0 2px var(--surface); }
+  .send-actions .label-long { display: none; }
+  .send-actions .label-short { display: inline; }
+}
 @media (max-width: 720px) {
   .page { padding: 56px 16px 32px; }
   .brand { gap: 16px; }
+  .version { margin-left: -6px; }
   .brand-mark .icon { width: 34px; height: 34px; }
   .brand-name { font-size: 2.3rem; }
   .box { padding: 20px; }
@@ -429,7 +443,6 @@ textarea { resize: none; display: block; }
   .qr-box[open] .chev { transform: rotate(180deg); }
   .qr-box[open] canvas { margin-top: 12px; }
   .share-title { font-size: 16px; }
-  .send-actions .pill-btn { flex: 1 1 auto; }
   .list > li, .bundle, .card-header { padding-left: 14px; padding-right: 14px; }
 }
 @media (max-width: 720px) {
@@ -448,6 +461,10 @@ textarea { resize: none; display: block; }
 @keyframes sheet-in { from { transform: translateY(40px); opacity: 0; } }
 @media (max-width: 420px) {
   .file-thumb { width: 34px; height: 34px; }
+}
+@media (max-width: 374px) {
+  .box { padding: 16px; }
+  .send-actions .pill-btn { padding: 0 8px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
