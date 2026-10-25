@@ -38,9 +38,6 @@ services:
           --use-auth-secret \
           --no-multicast-peers \
           --no-tcp-relay \
-          --user-quota=12 \
-          --total-quota=1200 \
-          --max-bps=12500000 \
           --denied-peer-ip=0.0.0.0-0.255.255.255 \
           --denied-peer-ip=10.0.0.0-10.255.255.255 \
           --denied-peer-ip=100.64.0.0-100.127.255.255 \
