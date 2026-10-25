@@ -58,6 +58,9 @@ const ICE       = argv.ice || 'auto';
 const SIZE      = Number(argv.size || 419430400);
 const OBSERVE_MS = Number(argv.observe || 60000);
 const COTURN    = argv.coturn || 'filesync-coturn';
+// The SW sink delivers the browser download only at completion, so slow (throttled or
+// relayed) runs need longer than the default.
+const DOWNLOAD_TIMEOUT_MS = Math.max(300000, OBSERVE_MS + 180000);
 
 // ---------- process-tree helpers (macOS ps) ----------
 function procTable() {
@@ -154,7 +157,7 @@ const INIT_SCRIPT = `
       const d = ev.data;
       if (typeof d === 'string') {
         let type = 'str';
-        try { const m = JSON.parse(d); if (m && m.type) type = m.type; } catch {}
+        try { const m = JSON.parse(d); if (m && (m.t || m.type)) type = m.t || m.type; } catch {}
         if (type === 'header' || d.length < 400) e.strFrames.push({ t: Date.now(), type, raw: d.length < 120 ? d : undefined });
         else e.strFrames.push({ t: Date.now(), type });
       } else {
@@ -177,9 +180,12 @@ async function samplePage(page, label, t) {
       page.evaluate(() => {
         const room = window.__filesync?.room;
         const f = room ? [...room.files.values()][0] : null;
+        const row = document.querySelector('#files li.file');
         return {
           file: f ? { status: f.status, written: f.written, size: f.size, error: f.error, sha256: f.sha256 } : null,
-          bundle: room?.bundle ? { state: room.bundle.state, index: room.bundle.index, count: room.bundle.count } : null,
+          // Row buttons the person can actually use right now (e.g. resume, retry, download).
+          actions: row ? [...row.querySelectorAll('button[data-act]')].filter((b) => !b.hidden).map((b) => b.dataset.act) : [],
+          bundle: room?.bundle ? { state: room.bundle.state, index: room.bundle.index, count: room.bundle.count, error: room.bundle.error } : null,
           phase: room?.phase ?? null,
           fatal: room?.error ?? null,
           hostLink: room?.hostLink ?? null,
@@ -290,7 +296,7 @@ async function pair({ senderB, receiverB, qs }) {
 // Starts the download click; returns { downloadPromise } (resolves with the Playwright
 // Download at delivery — SW staging delivers the browser download only at completion).
 async function startTransfer({ sender, receiver, fixture }) {
-  const downloadPromise = receiver.waitForEvent('download', { timeout: 300000 });
+  const downloadPromise = receiver.waitForEvent('download', { timeout: DOWNLOAD_TIMEOUT_MS });
   await sender.setInputFiles('#file-input', fixture.path);
   const row = receiver.locator('#files li.file').first();
   await row.waitFor({ state: 'visible', timeout: 30000 });
@@ -333,7 +339,9 @@ async function waitForModalProgress(receiver, pct, timeoutMs = 120000) {
 }
 
 // ---------- report helpers ----------
-const rel = (t, t0) => t - t0;
+const pct = (f) => (f && f.size ? Math.floor((f.written / f.size) * 100) : 0);
+const rowSummary = (ui) => (ui?.file ? `${ui.file.status} ${pct(ui.file)}%` : null);
+const hasError = (ui) => !!(ui && (ui.file?.error || ui.fatal || ui.bundle?.error));
 function summarizeDc(rec) {
   if (!rec) return null;
   return rec.dcs.map((d) => ({
@@ -380,10 +388,10 @@ async function observe({ sender, receiver, ms, downloadPromise }) {
       if (settled) r.downloadError = settled.err;
     }
     report.samples.push({ t, s, r });
-    log(`observe tick ${report.samples.length}`, {
-      sAlive: s.alive, rAlive: r.alive,
-      sUi: s.ui && s.ui.progress, rUi: r.ui && r.ui.progress,
-    });
+    log(`observe tick ${report.samples.length}`, JSON.stringify({
+      sAlive: s.alive && !s.ui?.unreachable, rAlive: r.alive && !r.ui?.unreachable,
+      r: rowSummary(r.ui), host: r.ui?.hostLink, phase: r.ui?.phase, bundle: r.ui?.bundle?.state,
+    }));
     await timeout(1000);
   }
   return { dlSettled };
@@ -416,7 +424,7 @@ async function main() {
       for (const f of zipFixtures) {
         if (!f.sha256) f.sha256 = await sha256File(f.path);
       }
-      downloadPromise = receiver.waitForEvent('download', { timeout: 300000 });
+      downloadPromise = receiver.waitForEvent('download', { timeout: DOWNLOAD_TIMEOUT_MS });
       await sender.setInputFiles('#file-input', zipFixtures.map((f) => f.path));
       await receiver.waitForSelector('#download-all-btn', { state: 'visible', timeout: 30000 });
       await receiver.click('#download-all-btn');
@@ -555,38 +563,48 @@ async function pcStates(b) {
 
 function printVerdict() {
   const R = report;
-  const lastSampleR = [...R.samples].reverse().find((x) => x.r && x.r.ui);
-  const firstReceiverError = R.samples.find((x) => x.r?.ui?.rowError?.shown || x.r?.ui?.fatal?.shown);
+  const lastSampleR = [...R.samples].reverse().find((x) => x.r?.ui && !x.r.ui.unreachable);
+  const firstReceiverError = R.samples.find((x) => hasError(x.r?.ui));
+  const statuses = [];
+  for (const x of R.samples) {
+    const st = x.r?.ui?.file?.status;
+    if (st && statuses[statuses.length - 1] !== st) statuses.push(st);
+  }
   const recDcs = R.receiverRec || [];
-  const dataDc = recDcs.find((d) => d.binCount > 0);
+  // One data channel per transfer attempt (a resume opens a new one), so report them all.
+  const dataDcs = recDcs.filter((d) => d.binCount > 0);
+  const at = (t) => `+${((t - T0) / 1000).toFixed(1)}s`;
   console.log('\n================ VERDICT SUMMARY ================');
   console.log(`scenario:            ${SCENARIO} (sink=${SINK} ice=${ICE})`);
-  if (dataDc) {
-    console.log(`receiver data dc:    bins=${dataDc.binCount} bytes=${dataDc.binBytes}`);
-    console.log(`last byte at:        +${((dataDc.lastBinAt - T0) / 1000).toFixed(1)}s`);
-    console.log(`control frames seen: ${dataDc.strFrames.map((f) => f.type).join(',') || 'none'}`);
-    console.log(`dc close event:      ${dataDc.events.find((e) => e.s === 'close')
-      ? `+${((dataDc.events.find((e) => e.s === 'close').t - T0) / 1000).toFixed(1)}s` : 'NEVER'}`);
+  if (dataDcs.length) {
+    const sum = (k) => dataDcs.reduce((s, d) => s + d[k], 0);
+    console.log(`receiver data dcs:   ${dataDcs.length} channels, bins=${sum('binCount')} bytes=${sum('binBytes')}`);
+    console.log(`last byte at:        ${at(Math.max(...dataDcs.map((d) => d.lastBinAt)))}`);
+    for (const d of dataDcs) {
+      const close = d.events.find((e) => e.s === 'close');
+      console.log(`  ${d.label.padEnd(18)} bytes=${d.binBytes} frames=${d.strFrames.map((f) => f.type).join(',') || 'none'} close=${close ? at(close.t) : 'NEVER'}`);
+    }
   } else {
     console.log(`receiver data dc:    none seen (rec=${R.receiverRec ? 'present' : 'unavailable'})`);
   }
   console.log(`receiver error UI:   ${firstReceiverError ? `at +${((firstReceiverError.t - T0) / 1000).toFixed(1)}s` : 'NEVER during observation'}`);
-  if (lastSampleR?.r?.ui) {
-    console.log(`receiver final row:  progress="${lastSampleR.r.ui.progress}" loading=${lastSampleR.r.ui.loading} failed=${lastSampleR.r.ui.failed} rowError=${JSON.stringify(lastSampleR.r.ui.rowError)}`);
-    console.log(`receiver fatal page: ${JSON.stringify(lastSampleR.r.ui.fatal)}`);
+  console.log(`receiver statuses:   ${statuses.join(' -> ') || 'none sampled'}`);
+  if (lastSampleR) {
+    const ui = lastSampleR.r.ui;
+    console.log(`receiver final row:  ${rowSummary(ui)} error=${JSON.stringify(ui.file?.error ?? null)} actions=[${ui.actions.join(',')}]`);
+    if (ui.bundle) console.log(`receiver bundle:     ${ui.bundle.state} ${ui.bundle.index}/${ui.bundle.count} error=${JSON.stringify(ui.bundle.error)}`);
+    console.log(`receiver room:       phase=${ui.phase} hostLink=${ui.hostLink} fatal=${JSON.stringify(ui.fatal)}`);
   }
   console.log(`download outcome:    failure=${JSON.stringify(R.downloadFailure)} check=${JSON.stringify(R.downloadCheck)}`);
   if (R.downloadCheck && R.downloadCheck.members) {
     console.log(`zip members:         ${R.downloadCheck.members.map((m) => `${m.name}=${m.result}`).join('  ')}`);
   }
-  // Invariant: a "click download" row must show the control (the only resume route).
-  const resumableRow = [...R.samples].reverse().find(
-    (x) => x.r?.ui?.rowError?.shown && /Click download/i.test(x.r.ui.rowError.text || ''),
-  );
-  if (resumableRow) {
-    const btn = resumableRow.r.ui.downloadBtn;
-    const visible = btn === 'block' || btn === 'inline-block';
-    console.log(`resume affordance:   ${visible ? `OK (download visible: ${btn})` : `FAIL (download hidden: ${btn})`}`);
+  // Invariant: a paused or failed single-file row must offer a way to continue.
+  const stuck = [...R.samples].reverse().find((x) => !x.r?.ui?.bundle && ['paused', 'failed'].includes(x.r?.ui?.file?.status));
+  if (stuck) {
+    const ui = stuck.r.ui;
+    const ok = ui.actions.includes(ui.file.status === 'paused' ? 'resume' : 'retry');
+    console.log(`resume affordance:   ${ok ? 'OK' : 'FAIL'} (${ui.file.status}, actions=[${ui.actions.join(',')}])`);
   }
   console.log('================================================\n');
 }
