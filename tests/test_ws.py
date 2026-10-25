@@ -121,13 +121,6 @@ class TestRegisterHappyPath:
             assert before + ttl <= int(expiry) <= int(time.time()) + ttl
             assert turn["credential"] == _expected_credential(turn["username"])
 
-    def test_turns_url_only_when_turns_port_set(self, client, monkeypatch):
-        with _connected(client, "peer-1") as (_ws, msg):
-            assert not any(u.startswith("turns:") for u in msg["ice"]["iceServers"][1]["urls"])
-        monkeypatch.setattr(signaling, "_TURNS_PORT", 5349)
-        with _connected(client, "peer-2") as (_ws, msg):
-            assert "turns:testserver:5349?transport=tcp" in msg["ice"]["iceServers"][1]["urls"]
-
     def test_turn_host_and_port_override(self, client, monkeypatch):
         monkeypatch.setattr(signaling, "_TURN_HOST", "turn.example.com")
         monkeypatch.setattr(signaling, "_TURN_PORT", 3479)

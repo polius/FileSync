@@ -66,26 +66,11 @@ class TestVersion:
         assert main.app.version == "9.9.9-test"
         assert signaling._APP_VERSION == "9.9.9-test", "version must reach the 'registered' reply"
 
-    def test_version_from_file(self, main):
-        expected = (REPO_ROOT / "VERSION").read_text().strip()
-        assert expected
-        assert main.app.version == expected
-
-    def test_repo_version_file_format(self):
-        text = (REPO_ROOT / "VERSION").read_text()
-        assert text.endswith("\n") and text.count("\n") == 1
-
-    def test_version_file_fallbacks(self, main, monkeypatch, tmp_path):
+    def test_version_defaults_to_dev(self, main, monkeypatch):
         monkeypatch.delenv("APP_VERSION", raising=False)
-        vfile = tmp_path / "VERSION"
-        monkeypatch.setattr(main, "_VERSION_FILE", vfile)
-        assert main.load_version() == "dev"  # missing
-        vfile.write_text("\n")
-        assert main.load_version() == "dev"  # empty
-        vfile.write_text(" 1.2.3 \n")
-        assert main.load_version() == "1.2.3"
+        assert main.load_version() == "dev"
         monkeypatch.setenv("APP_VERSION", "  ")
-        assert main.load_version() == "1.2.3", "blank env var must not win"
+        assert main.load_version() == "dev", "a blank env var means no version"
 
 
 class TestLoadSecret:

@@ -286,7 +286,6 @@ def _env_ip(name: str) -> Optional[str]:
 _TURN_TTL_SECONDS = int(os.getenv("FILESYNC_TURN_TTL_SECONDS", "3600"))
 _TURN_HOST = os.getenv("TURN_HOST") or None   # default: the host the client connected to
 _TURN_PORT = _env_port("TURN_PORT", 3478)
-_TURNS_PORT = _env_port("TURNS_PORT", None)   # TURN over TLS is opt-in (needs a cert)
 # Public IP for relay candidates; overrides the per-recipient Host-header address.
 _TURN_EXTERNAL_IP = _env_ip("TURN_EXTERNAL_IP")
 
@@ -336,8 +335,6 @@ def _ice_config(ws: WebSocket, peer_id: str) -> dict:
     h = _url_host(host)
     username, credential = _turn_credentials(peer_id, ttl)
     turn_urls = [f"turn:{h}:{_TURN_PORT}", f"turn:{h}:{_TURN_PORT}?transport=tcp"]
-    if _TURNS_PORT:
-        turn_urls.append(f"turns:{h}:{_TURNS_PORT}?transport=tcp")
     return {
         "iceServers": [
             {"urls": f"stun:{h}:{_TURN_PORT}"},

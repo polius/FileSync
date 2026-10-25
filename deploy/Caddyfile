@@ -1,7 +1,4 @@
 yourdomain.com {
-	# No includeSubDomains: yourdomain.com may be an apex whose other subdomains aren't
-	# (all) on HTTPS, and HSTS on the apex would lock browsers out of them for a year.
 	header Strict-Transport-Security "max-age=31536000"
-	# Caddy sets X-Forwarded-For; nginx in the app container trusts it from this private hop.
 	reverse_proxy filesync:80
 }

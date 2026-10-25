@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -26,19 +25,10 @@ def load_secret() -> str:
         raise RuntimeError(f"Secret file {path} is empty — delete the keys volume and restart the stack.")
     return key
 
-# The release version has a single source of truth: the repo-root VERSION file. Images
-# that don't ship that file pass it in as APP_VERSION at build time instead; "dev" marks
-# a checkout running without either.
-_VERSION_FILE = Path(__file__).resolve().parent.parent / "VERSION"
-
+# Release images get the version from the git tag at build time (APP_VERSION); "dev" marks
+# anything else.
 def load_version() -> str:
-    version = os.getenv("APP_VERSION", "").strip()
-    if version:
-        return version
-    try:
-        return _VERSION_FILE.read_text().strip() or "dev"
-    except OSError:
-        return "dev"
+    return os.getenv("APP_VERSION", "").strip() or "dev"
 
 SECRET_KEY = load_secret()
 

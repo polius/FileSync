@@ -1,12 +1,7 @@
-# TLS topology: Caddy terminates HTTPS and proxies to the stack (mirrors docker-compose.yml).
-# TURN over TLS: add -f docker-compose.turns.yml (see that file).
-
 services:
   caddy:
-    # Pinned: third-party image terminating TLS.
     image: caddy:2.11.7-alpine
     container_name: filesync-caddy
-    # 80 serves the ACME HTTP-01 challenge and Caddy's automatic HTTP->HTTPS redirect.
     ports:
       - "80:80"
       - "443:443"
@@ -19,9 +14,7 @@ services:
     restart: unless-stopped
 
   filesync:
-    # Built and attested by release.yml. The version bump updates this pin (CI checks it
-    # matches VERSION). No `init: true`: the image runs tini as PID 1 already.
-    image: poliuscorp/filesync:4.5.0
+    image: poliuscorp/filesync
     container_name: filesync-app
     environment:
       - SECRET_FILE=/keys/secret
@@ -35,21 +28,8 @@ services:
     restart: unless-stopped
 
   coturn:
-    # Pinned: third-party image sitting directly on the media path.
     image: coturn/coturn:4.18.0-alpine
     container_name: filesync-coturn
-    # Read the shared secret from /keys, then exec turnserver.
-    # --no-tcp-relay: browsers only request UDP allocations; TCP relays (RFC 6062) are what
-    #   would make this a generic TCP proxy. Clients may still reach TURN itself over TCP.
-    # Quotas cap allocations per user / in total; --max-bps (bytes/s per session) is
-    #   12.5 MB/s = 100 Mbit/s, above any normal relayed transfer, so it only bounds abuse.
-    # --no-tls: this stack has no certificate (coturn still logs a harmless "Certificate file
-    #   not found" warning; DTLS and the CLI are off by default in 4.18). docker-compose.turns.yml
-    #   swaps --no-tls for cert flags via TURN_TLS_ARGS (unquoted on purpose: one word per flag).
-    # Denied peers: private, loopback, link-local, CGNAT, "this network", IETF protocol
-    #   assignments and benchmarking ranges, so the relay can't reach internal services.
-    # The 101-port relay range suits small instances; for large ones widen it (or use host
-    #   networking) and set TURN_EXTERNAL_IP on the filesync service if behind NAT.
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -73,7 +53,7 @@ services:
           --denied-peer-ip=::1 \
           --denied-peer-ip=fc00::-fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff \
           --denied-peer-ip=fe80::-febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff \
-          $${TURN_TLS_ARGS:---no-tls} \
+          --no-tls \
           --log-file=stdout \
           --realm=${TURN_REALM:-filesync} \
           --static-auth-secret="$$secret" \
@@ -92,14 +72,13 @@ services:
     restart: unless-stopped
 
   init:
-    image: poliuscorp/filesync:4.5.0
+    image: poliuscorp/filesync
     container_name: filesync-init
     command: python3 api/init_secret.py
     volumes:
       - keys:/keys
 
 volumes:
-  # Caddy's certificates and ACME account; losing it means re-issuing (and rate limits).
   caddy_data:
   caddy_config:
   keys:

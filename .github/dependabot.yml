@@ -22,8 +22,8 @@ updates:
           - "minor"
           - "patch"
 
-  # Deploy recipes (coturn, caddy pins). The app's own image is pinned to VERSION and
-  # bumped with each release, so Dependabot leaves it alone.
+  # Deploy recipes (coturn, caddy pins). The app's own image uses latest, so Dependabot
+  # leaves it alone.
   - package-ecosystem: "docker-compose"
     directory: "/deploy"
     schedule:

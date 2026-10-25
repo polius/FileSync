@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: docker build --build-arg VERSION="$(cat VERSION)" -t filesync:ci .
+      - run: docker build -t filesync:ci .
       - name: Scan image (CRITICAL, fixed-only)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -48,8 +48,6 @@ jobs:
           python-version-file: .python-version
       - run: pip install ruff
       - run: ruff check api tests
-      - name: Version consistency (VERSION, compose pins, stale references)
-        run: sh .github/scripts/check-version.sh
       - name: Image Python matches .python-version
         run: |
           want="python:$(cat .python-version)-alpine"
@@ -76,9 +74,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build image and start stack
         run: |
-          # Tag as the version the compose file pins so `docker compose up` below uses
+          # Tag as the image the compose file uses (latest) so `docker compose up` below uses
           # this build instead of pulling the released image from Docker Hub. Never pushed.
-          docker build --build-arg VERSION="$(cat VERSION)" -t "poliuscorp/filesync:$(cat VERSION)" .
+          docker build -t poliuscorp/filesync .
           docker compose -f deploy/docker-compose.yml up -d --wait
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:

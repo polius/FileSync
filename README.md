@@ -80,7 +80,6 @@ Set these as `environment:` entries on the `filesync` service.
 |---|---|---|
 | `TURN_HOST` | the address users open | Hostname or IP of the TURN server, if it differs from the website's |
 | `TURN_PORT` | `3478` | TURN/STUN port advertised to browsers |
-| `TURNS_PORT` | unset | Also offer TURN over TLS on this port (see below) |
 | `TURN_EXTERNAL_IP` | unset | Public IP of the TURN server. Set it when the website sits behind a CDN or proxy whose address isn't the TURN server's |
 | `FILESYNC_TURN_TTL_SECONDS` | `3600` | Lifetime of TURN credentials (browsers refresh them automatically) |
 | `FILESYNC_CLAIM_GRACE_SECONDS` | `120` | How long a room stays reserved after its host disconnects, so a reload keeps the same link |
@@ -88,14 +87,6 @@ Set these as `environment:` entries on the `filesync` service.
 | `FILESYNC_EXPOSE_STATS` | unset | Set to `1` to include connection counts in `/api/health` |
 
 **Custom HTTP port.** In `docker-compose.yml`, change the first number of the `filesync` port mapping, for example `"8080:80"`.
-
-**TURN over TLS.** Some office and hotel networks block everything except HTTPS. To reach them, run TURN over TLS with a certificate for your domain: put `fullchain.pem` and `privkey.pem` in a `certs/` folder next to the compose files and add the override file:
-
-```bash
-docker compose -f docker-compose-ssl.yml -f docker-compose.turns.yml up -d
-```
-
-See the comments in [`deploy/docker-compose.turns.yml`](deploy/docker-compose.turns.yml) for using port 443 with a second IP address.
 
 ## How it works
 
