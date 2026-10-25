@@ -90,35 +90,15 @@ Set these as `environment:` entries on the `filesync` service.
 
 ## How it works
 
-FileSync uses native [WebRTC](https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API) to move files directly between browsers. A small WebSocket signaling server, served at `/ws` by the FileSync container, helps devices find each other: it relays connection offers and network candidates, and hands out short-lived TURN credentials. Once two devices are connected, file bytes flow between them and never pass through the server. When a direct path isn't possible, the coturn relay forwards the encrypted data without being able to read it.
+FileSync uses [WebRTC](https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API) to send files directly between browsers. The server only helps devices find each other; file data never passes through it. When a direct connection isn't possible, the bundled TURN relay forwards the encrypted data without being able to read it. Every file is checked with SHA-256 when it arrives.
 
-- **One connection per pair of devices.** Every file transfer opens its own data channel on that connection, so starting a download is instant.
-- **Room ownership.** Each device proves it owns its id with a secret that never leaves the browser tab, so nobody can take over a room by registering its id. A reload keeps the same room link.
-- **Trust.** The host decides who is in the room and checks the password with a challenge and response, so the password never crosses the network. Each device only accepts room changes from the host, and the host stamps every file and message with the real sender.
-- **Integrity.** Files are hashed with SHA-256 on both sides as they stream. A transfer that doesn't match is discarded, never saved.
+Over HTTPS, files are written to disk as they arrive. Over plain HTTP they're held in memory until complete, so use HTTPS for large files.
 
-On the receiving side, FileSync uses the first save method the browser supports:
-
-1. **File System Access API**: writes straight to a file you pick. Desktop Chromium browsers (Chrome, Edge, Brave, Opera) over HTTPS.
-2. **Service Worker**: writes to browser storage (OPFS) as the file arrives, then hands the finished file to a normal browser download. Needs free space for about twice the file size. All modern browsers over HTTPS.
-3. **Memory**: holds the whole file in memory before saving. Last resort, and the only option over plain HTTP.
-
-The first two need a secure context (HTTPS or localhost), which is why Option B is recommended.
-
-If something doesn't work on a particular device, open `/test.html` on it. It checks the browser, the save method, the signaling server and the relay, and produces a report you can share.
+If something doesn't work on a device, open `/test.html` on it for a diagnostic report.
 
 ![File Transfer - https://xkcd.com/949](web/assets/comic.png)
 
 *Comic: [xkcd #949 — "File Transfer"](https://xkcd.com/949) by [Randall Munroe](https://xkcd.com), licensed under [CC BY-NC 2.5](https://creativecommons.org/licenses/by-nc/2.5/).*
-
-## Development
-
-```bash
-npm ci && npm run lint && npm test            # frontend lint and unit tests
-pip install -r api/requirements.txt pytest httpx && pytest tests   # backend tests
-docker build --build-arg VERSION=dev -t filesync .                 # image
-cd e2e && npm ci && node run.mjs --smoke                           # browser end-to-end
-```
 
 ## Related projects
 
