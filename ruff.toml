@@ -1,4 +1,5 @@
-target-version = "py314"
+# Keep in step with .python-version (the image and CI interpreter).
+target-version = "py315"
 line-length = 110
 
 [lint]

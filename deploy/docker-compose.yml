@@ -1,7 +1,8 @@
 services:
   filesync:
-    # Built and published by release.yml. Pin a version/digest for production.
-    image: poliuscorp/filesync
+    # Built and published by release.yml. The version bump updates this pin (CI checks it
+    # matches VERSION). No `init: true`: the image runs tini as PID 1 already.
+    image: poliuscorp/filesync:4.5.0
     container_name: filesync-app
     environment:
       - SECRET_FILE=/keys/secret
@@ -21,6 +22,17 @@ services:
     image: coturn/coturn:4.18.0-alpine
     container_name: filesync-coturn
     # Read the shared secret from /keys, then exec turnserver.
+    # --no-tcp-relay: browsers only request UDP allocations; TCP relays (RFC 6062) are what
+    #   would make this a generic TCP proxy. Clients may still reach TURN itself over TCP.
+    # Quotas cap allocations per user / in total; --max-bps (bytes/s per session) is
+    #   12.5 MB/s = 100 Mbit/s, above any normal relayed transfer, so it only bounds abuse.
+    # --no-tls: this stack has no certificate (coturn still logs a harmless "Certificate file
+    #   not found" warning; DTLS and the CLI are off by default in 4.18). docker-compose.turns.yml
+    #   swaps --no-tls for cert flags via TURN_TLS_ARGS (unquoted on purpose: one word per flag).
+    # Denied peers: private, loopback, link-local, CGNAT, "this network", IETF protocol
+    #   assignments and benchmarking ranges, so the relay can't reach internal services.
+    # The 101-port relay range suits small instances; for large ones widen it (or use host
+    #   networking) and set TURN_EXTERNAL_IP on the filesync service if behind NAT.
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -28,15 +40,25 @@ services:
           --fingerprint \
           --use-auth-secret \
           --no-multicast-peers \
+          --no-tcp-relay \
+          --user-quota=12 \
+          --total-quota=1200 \
+          --max-bps=12500000 \
+          --denied-peer-ip=0.0.0.0-0.255.255.255 \
           --denied-peer-ip=10.0.0.0-10.255.255.255 \
-          --denied-peer-ip=172.16.0.0-172.31.255.255 \
-          --denied-peer-ip=192.168.0.0-192.168.255.255 \
           --denied-peer-ip=100.64.0.0-100.127.255.255 \
+          --denied-peer-ip=127.0.0.0-127.255.255.255 \
           --denied-peer-ip=169.254.0.0-169.254.255.255 \
+          --denied-peer-ip=172.16.0.0-172.31.255.255 \
+          --denied-peer-ip=192.0.0.0-192.0.0.255 \
+          --denied-peer-ip=192.168.0.0-192.168.255.255 \
+          --denied-peer-ip=198.18.0.0-198.19.255.255 \
+          --denied-peer-ip=::1 \
           --denied-peer-ip=fc00::-fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff \
           --denied-peer-ip=fe80::-febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff \
-          --no-cli \
-          --realm=filesync.app \
+          $${TURN_TLS_ARGS:---no-tls} \
+          --log-file=stdout \
+          --realm=${TURN_REALM:-filesync} \
           --static-auth-secret="$$secret" \
           --listening-port=3478 \
           --min-port=50000 \
@@ -53,7 +75,7 @@ services:
     restart: unless-stopped
 
   init:
-    image: poliuscorp/filesync
+    image: poliuscorp/filesync:4.5.0
     container_name: filesync-init
     command: python3 api/init_secret.py
     volumes:
