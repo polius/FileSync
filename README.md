@@ -90,6 +90,16 @@ Set these as `environment:` entries on the `filesync` service.
 
 ## How it works
 
+<p align="center">
+  <a href="https://filesync.app/video.mp4">
+    <img src="web/assets/video-poster.png"
+      alt="Watch the FileSync video — a one-minute walkthrough of how it works">
+  </a>
+</p>
+
+<p align="center"><em>One minute: opening a room, sharing the link, sending files browser to browser,
+verified links, and resuming large transfers. Plays as an MP4 in your browser.</em></p>
+
 FileSync uses [WebRTC](https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API) to send files directly between browsers. The server only helps devices find each other; file data never passes through it. When a direct connection isn't possible, the bundled TURN relay forwards the encrypted data without being able to read it. Every file is checked with SHA-256 when it arrives.
 
 Over HTTPS, files are written to disk as they arrive. Over plain HTTP they're held in memory until complete, so use HTTPS for large files.
