@@ -5,15 +5,17 @@ on:
     branches: [main]
   pull_request:
 
+# Actions are pinned to full commit SHAs (tag in the trailing comment); Dependabot bumps both.
+
 jobs:
   # Builds the image, then scans it for unfixed CRITICAL vulnerabilities.
   docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: docker build -t filesync:ci .
       - name: Scan image (CRITICAL, fixed-only)
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: filesync:ci
           exit-code: '1'
@@ -24,50 +26,59 @@ jobs:
   python:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: "3.14"
-      - run: pip install -r api/requirements.txt pytest pytest-cov pip-audit
+          python-version-file: .python-version
+      # httpx: Starlette's TestClient transport.
+      - run: pip install -r api/requirements.txt pytest pytest-cov pip-audit httpx
       - run: pip-audit -r api/requirements.txt
       - env:
           SECRET_KEY: ci-not-a-real-secret
         run: python -c "import api.main, api.signaling; print('import OK')"
       - run: python -m pytest tests -q --cov=api --cov-report=term-missing
 
-  # Static analysis + JS unit tests.
+  # Static analysis + JS unit tests + repo consistency.
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: "3.14"
+          python-version-file: .python-version
       - run: pip install ruff
       - run: ruff check api tests
-      - uses: actions/setup-node@v7
+      - name: Image Python matches .python-version
+        run: |
+          want="python:$(cat .python-version)-alpine"
+          bad=$(grep -E '^FROM python:' Dockerfile | grep -v "FROM $want" || true)
+          [ -z "$bad" ] || { echo "::error::Dockerfile base must be $want: $bad"; exit 1; }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
+      # The frontend ships unbundled, so a syntax error would only surface in a browser.
+      - name: Syntax-check web JS
+        run: find web -type f \( -name '*.js' -o -name '*.mjs' \) -print0 | xargs -0 -n1 node --check
       - run: npm ci
       - run: npm audit --audit-level=high
       - run: npm run lint
       - run: npm run test:coverage
 
-  # End-to-end smoke: real Chromium pair exchanging a 100 MB file through the actual
+  # End-to-end smoke: real Chromium pair exchanging a 20 MB file through the actual
   # container (nginx + FastAPI signaling), verified by SHA-256. Uses the exact compose
   # topology users deploy with, only swapping in a locally built image.
   e2e-smoke:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build image and start stack
         run: |
-          # Tag :latest so `docker compose up` below uses this build instead of
-          # pulling the released image from Docker Hub. Never pushed.
-          docker build -t poliuscorp/filesync:latest .
+          # Tag as the image the compose file uses (latest) so `docker compose up` below uses
+          # this build instead of pulling the released image from Docker Hub. Never pushed.
+          docker build -t poliuscorp/filesync .
           docker compose -f deploy/docker-compose.yml up -d --wait
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
       - name: Run smoke cell (chromium / sw sink / auto ICE)

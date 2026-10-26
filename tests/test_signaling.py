@@ -247,7 +247,7 @@ class TestConnectionCapacity:
 
     def test_registry_stats_shape(self):
         stats = signaling.registry_stats()
-        assert set(stats) == {"registered_peers", "connections", "max_connections"}
+        assert set(stats) == {"registered_peers", "claims", "connections", "max_connections"}
 
 
 class TestIdleTimeoutTolerance:

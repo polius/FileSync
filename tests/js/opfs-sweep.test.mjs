@@ -36,7 +36,7 @@ function setNavigator(value) {
 }
 setNavigator({ storage: { getDirectory: async () => fakeRoot } });
 
-const { sweepStaleStaging } = await import(new URL('../../web/js/modules/sink.js', import.meta.url).href);
+const { sweepStaleStaging } = await import(new URL('../../web/js/app/sink.js', import.meta.url).href);
 
 const HOUR = 60 * 60 * 1000;
 

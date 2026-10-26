@@ -163,26 +163,25 @@ async function runCell(cell, fixture) {
 
     const qs = `sink=${cell.sink}&ice=${cell.ice}`;
     await sender.goto(`${BASE_URL}/?${qs}`, { waitUntil: 'domcontentloaded', timeout: PAIR_TIMEOUT_MS });
-    await sender.waitForSelector('#transfer-div', { state: 'visible', timeout: PAIR_TIMEOUT_MS });
-    const shareUrl = await sender.locator('#transfer-url-value').textContent({ timeout: PAIR_TIMEOUT_MS });
+    await sender.waitForSelector('#room', { state: 'visible', timeout: PAIR_TIMEOUT_MS });
+    const shareUrl = await sender.getAttribute('#share-link', 'data-link', { timeout: PAIR_TIMEOUT_MS });
     if (!shareUrl) throw new Error('Sender never produced a share URL');
 
-    const receiverUrl = `${shareUrl.trim()}?${qs}`;
+    // The share link carries the security key in its fragment; the query goes before it.
+    const receiverUrl = withQuery(shareUrl, qs);
     await receiver.goto(receiverUrl, { waitUntil: 'domcontentloaded', timeout: PAIR_TIMEOUT_MS });
-    await receiver.waitForSelector('#transfer-div', { state: 'visible', timeout: PAIR_TIMEOUT_MS });
+    await receiver.waitForSelector('#room', { state: 'visible', timeout: PAIR_TIMEOUT_MS });
 
-    // Pairing complete when sender's "Connection established" badge appears.
-    await sender.waitForSelector('#transfer-status-success', { state: 'visible', timeout: PAIR_TIMEOUT_MS });
+    // Pairing is complete when the sender sees someone connected.
+    await sender.waitForSelector('#status-dot.ok', { timeout: PAIR_TIMEOUT_MS });
 
     // Push the file into the sender's hidden file input.
-    await sender.setInputFiles('#transfer-select-file-input', fixture.path);
+    await sender.setInputFiles('#file-input', fixture.path);
 
-    // Wait for the file row to materialise in the receiver's UI, then click its
-    // download button. Selector: any list item in the files list except the
-    // "No files transferred" placeholder.
-    const fileRow = receiver.locator('#transfer-files-list li:not(#transfer-files-list-empty)').first();
+    // Wait for the file row on the receiver, then click its Download button.
+    const fileRow = receiver.locator('#files li.file').first();
     await fileRow.waitFor({ state: 'visible', timeout: PAIR_TIMEOUT_MS });
-    const downloadButton = fileRow.locator('[id^="file-"][id$="-download"]').first();
+    const downloadButton = fileRow.locator('[data-act="download"]');
     await downloadButton.waitFor({ state: 'visible', timeout: PAIR_TIMEOUT_MS });
 
     // Capture the receiver-side bytes. Two paths:
@@ -223,6 +222,12 @@ async function runCell(cell, fixture) {
   } finally {
     await browser.close();
   }
+}
+
+function withQuery(url, qs) {
+  const u = new URL(url);
+  u.search = qs;
+  return u.toString();
 }
 
 // Shim `window.showSaveFilePicker` on the given context to capture writes into a

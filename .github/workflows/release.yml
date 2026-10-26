@@ -4,22 +4,25 @@ on:
   release:
     types: [published]
 
+# Actions are pinned to full commit SHAs (tag in the trailing comment); Dependabot bumps both.
+
 jobs:
   # Releases can be cut from any ref, so gate publishing on the tests.
   verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: "3.14"
-      - run: pip install -r api/requirements.txt pytest ruff
+          python-version-file: .python-version
+      # httpx: Starlette's TestClient transport.
+      - run: pip install -r api/requirements.txt pytest ruff httpx
       - run: ruff check api tests
       - env:
           SECRET_KEY: ci-not-a-real-secret
         run: python -c "import api.main, api.signaling; print('import OK')"
       - run: python -m pytest tests -q
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
@@ -39,10 +42,10 @@ jobs:
 
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           username: poliuscorp
           password: ${{ secrets.DOCKER_ACCESS_TOKEN }}
@@ -53,11 +56,11 @@ jobs:
           # Strip a leading "v" and an optional "." so both v4.0.0 and v.4.0.0 -> 4.0.0.
           SHORT_TAG="${GITHUB_REF_NAME#v}"
           SHORT_TAG="${SHORT_TAG#.}"
-          echo "short_tag=$SHORT_TAG" >> $GITHUB_OUTPUT
+          echo "short_tag=$SHORT_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: poliuscorp/filesync
           # Do not move the `latest` tag for a pre-release.
@@ -67,21 +70,55 @@ jobs:
             type=raw,value=${{ steps.tag.outputs.short_tag }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      - name: Build and push Docker image
-        id: push
-        uses: docker/build-push-action@v7
+      # Smoke-test the release before anything is pushed: build the amd64 image into the
+      # local daemon as the image the compose file uses (latest), and run it as users deploy it.
+      - name: Build image for the smoke test
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: ./Dockerfile
+          build-args: VERSION=${{ steps.tag.outputs.short_tag }}
+          platforms: linux/amd64
+          load: true
+          tags: poliuscorp/filesync
+          cache-to: type=gha,mode=max
+
+      - name: Start stack
+        run: docker compose -f deploy/docker-compose.yml up -d --wait
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Run smoke cell (chromium / sw sink / auto ICE)
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          node run.mjs --smoke --base-url=http://localhost --size=20M
+
+      - name: Teardown
+        if: always()
+        run: docker compose -f deploy/docker-compose.yml down -v
+
+      # Same inputs as the smoke build, so amd64 comes straight from the cache.
+      - name: Build and push Docker image
+        id: push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ./Dockerfile
+          build-args: VERSION=${{ steps.tag.outputs.short_tag }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
 
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v4
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: index.docker.io/poliuscorp/filesync
           subject-digest: ${{ steps.push.outputs.digest }}

@@ -2,7 +2,7 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['**/node_modules/**', 'web/js/vendors/**', 'e2e/**'],
+    ignores: ['**/node_modules/**', '**/.venv/**', 'web/js/vendors/**', 'e2e/**'],
   },
   {
     files: ['web/js/**/*.js', 'web/sw.js'],
@@ -12,9 +12,6 @@ export default [
       globals: {
         ...globals.browser,
         ...globals.serviceworker,
-        // Globals from scripts loaded before the modules (index.html).
-        QRious: 'readonly',
-        bootstrap: 'readonly',
       },
     },
     rules: {
@@ -24,6 +21,16 @@ export default [
       'no-dupe-keys': 'error',
       'no-fallthrough': 'error',
       'no-async-promise-executor': 'error',
+      'no-var': 'error',
+      'prefer-const': 'error',
+      eqeqeq: ['error', 'always', { null: 'ignore' }],
+      'no-implicit-globals': 'error',
+      'no-unsafe-optional-chaining': 'error',
+      'no-unreachable': 'error',
+      'no-self-compare': 'error',
+      'no-template-curly-in-string': 'error',
+      'no-unused-private-class-members': 'error',
+      'no-constant-binary-expression': 'error',
     },
   },
 ];

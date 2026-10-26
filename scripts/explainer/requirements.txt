@@ -1,0 +1,14 @@
+# Frame capture
+playwright
+
+# Local neural voice-over (Kokoro-82M, ONNX)
+onnxruntime
+kokoro-onnx
+soundfile
+numpy
+
+# Music + sound design (filters, convolution reverb)
+scipy
+
+# Word timestamps for the narration (and a pronunciation check)
+faster-whisper

@@ -6,6 +6,16 @@ const Stun = document.getElementById('stun');
 const Turn = document.getElementById('turn');
 const Err = document.getElementById('err');
 
+// Error text always goes in as text, never HTML.
+function showError(text) {
+  const span = document.createElement('span');
+  span.className = 'bad-text';
+  span.textContent = text;
+  Err.replaceChildren(span);
+}
+
+const randomToken = () => Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, '0')).join('');
+
 const diagnostics = {
   timestamp: new Date().toISOString(),
   url: window.location.href,
@@ -316,7 +326,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   refreshDiagnosticsView();
   if (caps.webrtc) {
     try { await iceTest(); }
-    catch (err) { Err.innerHTML = '<span style="color:var(--bad)">ICE test error: ' + (err.message || err) + '</span>'; }
+    catch (err) { showError('ICE test error: ' + (err.message || err)); }
     refreshDiagnosticsView();
   }
   try { await signalingProbe(); }
@@ -362,7 +372,7 @@ async function signalingProbe() {
     wsB = await openWs(wsUrl, idB);
   } catch (err) {
     diagnostics.signalingProbe.error = String(err);
-    sigWs.innerHTML = '🔴 Could not connect to signaling server: ' + err.message;
+    sigWs.textContent = '🔴 Could not connect to signaling server: ' + err.message;
     sigRw.innerHTML = '⚪ Skipped — signaling unreachable.';
     if (wsA && wsA.readyState === 1) wsA.close();
     if (wsB && wsB.readyState === 1) wsB.close();
@@ -417,7 +427,7 @@ async function signalingProbe() {
     return;
   }
   diagnostics.signalingProbe.rewriteWorking = true;
-  sigRw.innerHTML = '🟢 Relay address rewritten correctly to <code>' + receivedAddr + '</code> for this client. Remote peers will receive a reachable relay address.';
+  sigRw.textContent = '🟢 Relay address rewritten correctly to ' + receivedAddr + ' for this client. Remote peers will receive a reachable relay address.';
 }
 
 function openWs(url, id) {
@@ -428,13 +438,14 @@ function openWs(url, id) {
       reject(new Error('WebSocket open timed out after 5s'));
     }, 5000);
     ws.onopen = () => {
-      ws.send(JSON.stringify({ type: 'register', id }));
+      ws.send(JSON.stringify({ type: 'register', id, token: randomToken() }));
     };
     const onMsg = (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch { return; }
       if (m && m.type === 'registered') {
         clearTimeout(timeout);
         ws.removeEventListener('message', onMsg);
+        ws.registered = m;
         resolve(ws);
       } else if (m && m.type === 'error') {
         clearTimeout(timeout);
@@ -483,7 +494,6 @@ async function iceTest() {
     turnUdpUrl: null,
     turnTcpUrl: null,
     credentialsFetched: false,
-    jwtDecoded: false,
     gatheringState: 'new',
     gatheringTimedOut: false,
     candidates: [],
@@ -492,45 +502,34 @@ async function iceTest() {
   diagnostics.iceTest = ice;
   refreshDiagnosticsView();
 
-  // 1. Fetch credentials
-  const token = await _getToken();
-  if (!token) {
-    Err.innerHTML = '<span style="color:var(--bad)">Could not fetch TURN credentials from /api/credentials.</span>';
+  // 1. Get ICE servers. The server hands out TURN credentials only to a registered
+  // signaling session, so open one briefly.
+  let iceServers;
+  try {
+    const wsUrl = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + '/ws';
+    const ws = await openWs(wsUrl, 'probe' + Math.random().toString(36).slice(2, 10));
+    iceServers = (ws.registered && ws.registered.ice && ws.registered.ice.iceServers) || [];
+    try { ws.close(); } catch {}
+  } catch (err) {
+    showError('Could not get TURN credentials from the signaling server: ' + (err.message || err));
     return;
   }
   ice.credentialsFetched = true;
-
-  // 2. Decode JWT payload
-  let payload;
-  try {
-    payload = _decodeJwt(token);
-    ice.jwtDecoded = true;
-  } catch (err) {
-    Err.innerHTML = '<span style="color:var(--bad)">Failed to decode TURN credentials: ' + (err.message || err) + '</span>';
+  const turnEntry = iceServers.find((e) => e.username);
+  if (!turnEntry) {
+    showError('The signaling server returned no TURN credentials.');
     return;
   }
 
-  // Use the hostname as the page is served from. The production turn.js intentionally
-  // does NOT substitute 'localhost' for '127.0.0.1' (see comment in turn.js for the
-  // reasoning); the test page mirrors that behavior so the diagnostic reflects what
-  // the real app will see.
-  const host = window.location.hostname;
-  ice.stunUrl = `stun:${host}:3478`;
-  ice.turnUdpUrl = `turn:${host}:3478`;
-  ice.turnTcpUrl = `turn:${host}:3478?transport=tcp`;
+  // Use exactly the ICE servers the app itself gets, so this test matches real transfers.
+  const stunEntry = iceServers.find((e) => !e.username);
+  const turnUrls = Array.isArray(turnEntry.urls) ? turnEntry.urls : [turnEntry.urls];
+  ice.stunUrl = stunEntry ? (Array.isArray(stunEntry.urls) ? stunEntry.urls[0] : stunEntry.urls) : null;
+  ice.turnUdpUrl = turnUrls.find((u) => !u.includes('transport=tcp')) || null;
+  ice.turnTcpUrl = turnUrls.find((u) => u.startsWith('turn:') && u.includes('transport=tcp')) || null;
 
-  // 3. Create RTCPeerConnection with both UDP and TCP TURN URLs so we can verify
-  // each transport independently. We never connect to a remote — we only gather.
-  const pc = new RTCPeerConnection({
-    iceServers: [
-      { urls: ice.stunUrl },
-      {
-        urls: [ice.turnUdpUrl, ice.turnTcpUrl],
-        username: payload.username,
-        credential: payload.credential,
-      },
-    ],
-  });
+  // 2. Gather candidates with every server. We never connect to a remote.
+  const pc = new RTCPeerConnection({ iceServers });
 
   const matchType = (c) => {
     if (c.type) return c.type;
@@ -564,7 +563,7 @@ async function iceTest() {
     ice.candidates.push({ type, address, transport, raw: e.candidate.candidate });
 
     if (type === 'srflx') {
-      IP.innerHTML = '🟢 Your public IP address is ' + (address || 'unknown');
+      IP.textContent = '🟢 Your public IP address is ' + (address || 'unknown');
       Stun.innerHTML = '🟢 The STUN server is reachable.';
       diagnostics.iceServers.stun = true;
       diagnostics.iceServers.publicIP = address || null;
@@ -622,7 +621,7 @@ async function iceTest() {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
   } catch (err) {
-    Err.innerHTML = '<span style="color:var(--bad)">SDP setup failed: ' + (err.message || err) + '</span>';
+    showError('SDP setup failed: ' + (err.message || err));
     try { pc.close(); } catch {}
     return;
   }
@@ -642,34 +641,4 @@ async function iceTest() {
       refreshDiagnosticsView();
     }
   }, 15000);
-}
-
-async function _getToken() {
-  try {
-    const response = await fetch('/api/credentials', { method: 'GET' });
-    if (!response.ok) throw new Error(`Failed to fetch token: ${response.status} ${response.statusText}`);
-    const data = await response.json();
-    const token = data?.token;
-    if (!token) throw new Error('No token found in server response.');
-    return token;
-  } catch (err) {
-    console.error('Error fetching token:', err);
-  }
-}
-
-// base64url + UTF-8 aware JWT payload decoder. The previous implementation used
-// raw atob() on the payload section, but JWTs are base64url-encoded (uses '-'/'_'
-// instead of '+'/'/' and strips padding). atob() rejects '-'/'_' with
-// InvalidCharacterError — which fired intermittently depending on the random bytes
-// in the HMAC/uuid, producing a hard-to-debug "sometimes works" failure.
-function _decodeJwt(token) {
-  const parts = (token || '').split('.');
-  if (parts.length < 2) throw new Error('Malformed JWT (expected at least 2 segments).');
-  let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-  while (b64.length % 4 !== 0) b64 += '=';
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  const json = new TextDecoder('utf-8').decode(bytes);
-  return JSON.parse(json);
 }

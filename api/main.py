@@ -1,19 +1,13 @@
 import os
-import time
-import hmac
-import hashlib
-import base64
-import uuid
-import jwt
-from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api import signaling
 from api.signaling import router as signaling_router, registry_stats
 
-# SECRET_KEY signs both the TURN HMAC credentials and the JWT. The env var wins
-# (docker run, CI, dev); the compose files instead set SECRET_FILE, pointing at the
-# key the init service generates into the shared volume. Refuse to start without
+# SECRET_KEY signs the TURN HMAC credentials handed out over the signaling socket. The
+# env var wins (docker run, CI, dev); the compose files instead set SECRET_FILE, pointing
+# at the key the init service generates into the shared volume. Refuse to start without
 # either rather than failing later at request time.
 def load_secret() -> str:
     key = os.getenv("SECRET_KEY")
@@ -31,10 +25,24 @@ def load_secret() -> str:
         raise RuntimeError(f"Secret file {path} is empty — delete the keys volume and restart the stack.")
     return key
 
+# Release images get the version from the git tag at build time (APP_VERSION); "dev" marks
+# anything else.
+def load_version() -> str:
+    return os.getenv("APP_VERSION", "").strip() or "dev"
+
 SECRET_KEY = load_secret()
 
-# Init FastAPI
-app = FastAPI(title='FileSync API', version='4.4.0', root_path="/api")
+# Registry stats (peer and connection counts) are operational detail, not something to
+# hand every visitor; opt in for monitoring.
+_EXPOSE_STATS = os.getenv("FILESYNC_EXPOSE_STATS") == "1"
+
+# Init FastAPI. The interactive docs and OpenAPI schema are off: the HTTP surface is just
+# /health, and the schema would only map the attack surface for a scanner.
+app = FastAPI(title='FileSync API', version=load_version(), root_path="/api",
+              docs_url=None, redoc_url=None, openapi_url=None)
+
+# The signaling socket signs TURN credentials and reports the version on 'registered'.
+signaling.configure(secret_key=SECRET_KEY, version=app.version)
 
 # CORS is only needed when the frontend is served from a different origin than the API
 # (i.e. local development). In production everything is same-origin behind the reverse
@@ -49,44 +57,13 @@ if _cors_origins:
         allow_headers=["*"],
     )
 
-# Add root route
-@app.get("/")
-async def root():
-    return {"message": "Welcome to FileSync API!", "version": app.version}
-
-# Add health check route reporting liveness + signaling capacity.
+# Add health check route: liveness, plus signaling capacity when FILESYNC_EXPOSE_STATS=1.
 @app.get("/health")
 async def health_check():
-    return {"message": "FileSync API is running!", **registry_stats()}
-
-# Add uuid route
-@app.get("/uuid")
-async def uuid_check():
-    return {"uuid": str(uuid.uuid4())}
-
-# Add credentials route
-@app.get("/credentials")
-async def credentials():
-    # Define TTL (5 minutes)
-    ttl = 300
-
-    # Generate temporary credentials
-    username, credential = generate_turn_credentials(ttl)
-
-    # Generate token
-    expiration = datetime.now(tz=timezone.utc) + timedelta(seconds=ttl)
-    payload = {'username': username, 'credential': credential, 'exp': int(expiration.timestamp())}
-    token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
-
-    # Return token
-    return { "token": token }
-
-def generate_turn_credentials(ttl):
-    timestamp = int(time.time()) + ttl
-    username = f"{timestamp}:{uuid.uuid4().hex}"
-    dig = hmac.new(SECRET_KEY.encode(), username.encode(), hashlib.sha1).digest()
-    password = base64.b64encode(dig).decode()
-    return username, password
+    if _EXPOSE_STATS:
+        return {"status": "ok", **registry_stats()}
+    return {"status": "ok"}
 
 # Mount WebRTC signaling routes (/ws). Implementation lives in api/signaling.py.
+# TURN credentials and the app version travel over that socket (see 'registered').
 app.include_router(signaling_router)

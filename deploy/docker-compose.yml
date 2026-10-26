@@ -1,6 +1,5 @@
 services:
   filesync:
-    # Built and published by release.yml. Pin a version/digest for production.
     image: poliuscorp/filesync
     container_name: filesync-app
     environment:
@@ -17,10 +16,8 @@ services:
     restart: unless-stopped
 
   coturn:
-    # Pinned: third-party image sitting directly on the media path.
     image: coturn/coturn:4.18.0-alpine
     container_name: filesync-coturn
-    # Read the shared secret from /keys, then exec turnserver.
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -28,15 +25,22 @@ services:
           --fingerprint \
           --use-auth-secret \
           --no-multicast-peers \
+          --no-tcp-relay \
+          --denied-peer-ip=0.0.0.0-0.255.255.255 \
           --denied-peer-ip=10.0.0.0-10.255.255.255 \
-          --denied-peer-ip=172.16.0.0-172.31.255.255 \
-          --denied-peer-ip=192.168.0.0-192.168.255.255 \
           --denied-peer-ip=100.64.0.0-100.127.255.255 \
+          --denied-peer-ip=127.0.0.0-127.255.255.255 \
           --denied-peer-ip=169.254.0.0-169.254.255.255 \
+          --denied-peer-ip=172.16.0.0-172.31.255.255 \
+          --denied-peer-ip=192.0.0.0-192.0.0.255 \
+          --denied-peer-ip=192.168.0.0-192.168.255.255 \
+          --denied-peer-ip=198.18.0.0-198.19.255.255 \
+          --denied-peer-ip=::1 \
           --denied-peer-ip=fc00::-fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff \
           --denied-peer-ip=fe80::-febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff \
-          --no-cli \
-          --realm=filesync.app \
+          --no-tls \
+          --log-file=stdout \
+          --realm=${TURN_REALM:-filesync} \
           --static-auth-secret="$$secret" \
           --listening-port=3478 \
           --min-port=50000 \

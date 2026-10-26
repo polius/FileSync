@@ -12,6 +12,15 @@ node_modules
 e2e
 tests
 
+# Repo tooling / deploy recipes (the image only needs api/, web/, nginx.conf, docker/)
+deploy
+scripts
+conftest.py
+ruff.toml
+eslint.config.mjs
+package.json
+package-lock.json
+
 # Never ship Python bytecode
 __pycache__
 **/__pycache__
