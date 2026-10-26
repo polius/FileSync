@@ -35,7 +35,7 @@
 
 ### Option A — HTTP (quick local test)
 
-For trying FileSync on your own machine. Not for production; use [Option B](#option-b--https-own-domain-recommended) instead.
+For trying FileSync on your own machine. Not for production; use [Option B](#option-b--https-own-domain-recommended) instead. Over plain HTTP, received files are held in memory until complete (over HTTPS they stream to disk), so large files need Option B.
 
 1. Download [`deploy/docker-compose.yml`](deploy/docker-compose.yml).
 2. Start it:
@@ -72,6 +72,8 @@ Open these on your server's firewall:
 
 Most transfers connect directly. The relay range carries traffic only when one side is behind a strict firewall or symmetric NAT. Each pair of devices uses at most one relay port, so the default range serves about 100 relayed pairs at once.
 
+If something doesn't work on a device, open `/test.html` on it for a diagnostic report.
+
 ## Configuration (optional)
 
 Set these as `environment:` entries on the `filesync` service.
@@ -100,16 +102,6 @@ Set these as `environment:` entries on the `filesync` service.
 <p align="center"><em>One minute: opening a room, sharing the link, sending files browser to browser,
 verified links, and resuming large transfers. Plays as an MP4 in your browser.</em></p>
 
-FileSync uses [WebRTC](https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API) to send files directly between browsers. The server only helps devices find each other; file data never passes through it. When a direct connection isn't possible, the bundled TURN relay forwards the encrypted data without being able to read it. Every file is checked with SHA-256 when it arrives.
-
-Over HTTPS, files are written to disk as they arrive. Over plain HTTP they're held in memory until complete, so use HTTPS for large files.
-
-If something doesn't work on a device, open `/test.html` on it for a diagnostic report.
-
-![File Transfer - https://xkcd.com/949](web/assets/comic.png)
-
-*Comic: [xkcd #949 — "File Transfer"](https://xkcd.com/949) by [Randall Munroe](https://xkcd.com), licensed under [CC BY-NC 2.5](https://creativecommons.org/licenses/by-nc/2.5/).*
-
 ## Related projects
 
 If you prefer the terminal, check out [fsend](https://github.com/polius/fsend): fast, private file sharing from your command line.
@@ -117,3 +109,9 @@ If you prefer the terminal, check out [fsend](https://github.com/polius/fsend): 
 ## License
 
 Released under the [MIT License](LICENSE). Third-party components and their licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+<br>
+
+![File Transfer - https://xkcd.com/949](web/assets/comic.png)
+
+*Comic: [xkcd #949 — "File Transfer"](https://xkcd.com/949) by [Randall Munroe](https://xkcd.com), licensed under [CC BY-NC 2.5](https://creativecommons.org/licenses/by-nc/2.5/).*
