@@ -37,8 +37,10 @@ SECRET_KEY = load_secret()
 _EXPOSE_STATS = os.getenv("FILESYNC_EXPOSE_STATS") == "1"
 
 # Init FastAPI. The interactive docs and OpenAPI schema are off: the HTTP surface is just
-# /health, and the schema would only map the attack surface for a scanner.
-app = FastAPI(title='FileSync API', version=load_version(), root_path="/api",
+# /api/health, and the schema would only map the attack surface for a scanner.
+# nginx forwards /api/ unchanged, so routes carry the prefix themselves (FastAPI's
+# root_path parameter is deprecated).
+app = FastAPI(title='FileSync API', version=load_version(),
               docs_url=None, redoc_url=None, openapi_url=None)
 
 # The signaling socket signs TURN credentials and reports the version on 'registered'.
@@ -58,7 +60,7 @@ if _cors_origins:
     )
 
 # Add health check route: liveness, plus signaling capacity when FILESYNC_EXPOSE_STATS=1.
-@app.get("/health")
+@app.get("/api/health")
 async def health_check():
     if _EXPOSE_STATS:
         return {"status": "ok", **registry_stats()}

@@ -31,23 +31,23 @@ def main(monkeypatch):
 
 class TestHealth:
     def test_health_is_minimal_by_default(self, main):
-        r = TestClient(main.app).get("/health")
+        r = TestClient(main.app).get("/api/health")
         assert r.status_code == 200
         assert r.json() == {"status": "ok"}
 
     def test_health_stats_are_opt_in(self, monkeypatch):
         main = _load_main(monkeypatch, FILESYNC_EXPOSE_STATS="1")
-        body = TestClient(main.app).get("/health").json()
+        body = TestClient(main.app).get("/api/health").json()
         assert body["status"] == "ok"
         assert set(body) == {"status", "registered_peers", "claims", "connections", "max_connections"}
 
     def test_other_values_do_not_expose_stats(self, monkeypatch):
         main = _load_main(monkeypatch, FILESYNC_EXPOSE_STATS="true")
-        assert TestClient(main.app).get("/health").json() == {"status": "ok"}
+        assert TestClient(main.app).get("/api/health").json() == {"status": "ok"}
 
 
 class TestRemovedSurface:
-    @pytest.mark.parametrize("path", ["/", "/uuid", "/credentials"])
+    @pytest.mark.parametrize("path", ["/", "/api/uuid", "/api/credentials"])
     def test_removed_routes_404(self, main, path):
         assert TestClient(main.app).get(path).status_code == 404
 
@@ -109,12 +109,12 @@ class TestLoadSecret:
 
 class TestCors:
     def test_cors_off_by_default(self, main):
-        r = TestClient(main.app).get("/health", headers={"Origin": "http://localhost:5173"})
+        r = TestClient(main.app).get("/api/health", headers={"Origin": "http://localhost:5173"})
         assert "access-control-allow-origin" not in r.headers
 
     def test_cors_origins(self, monkeypatch):
         main = _load_main(monkeypatch, CORS_ORIGINS="http://localhost:5173, ")
-        r = TestClient(main.app).get("/health", headers={"Origin": "http://localhost:5173"})
+        r = TestClient(main.app).get("/api/health", headers={"Origin": "http://localhost:5173"})
         assert r.headers["access-control-allow-origin"] == "http://localhost:5173"
 
 
