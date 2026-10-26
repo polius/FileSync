@@ -30,7 +30,7 @@
 ## How it works
 
 <p align="center">
-  <a href="https://filesync.app/video.mp4">
+  <a href="https://pol.alzina.dev/videos/filesync.mp4">
     <img src="web/assets/video-poster.png"
       alt="Watch the FileSync video — a one-minute walkthrough of how it works">
   </a>
