@@ -27,6 +27,18 @@
 - **No installs or accounts**: recipients just open a link. Rooms can have a password.
 - **Self-hosted**: a single Docker image plus a TURN relay, both started with one command.
 
+## How it works
+
+<p align="center">
+  <a href="https://filesync.app/video.mp4">
+    <img src="web/assets/video-poster.png"
+      alt="Watch the FileSync video — a one-minute walkthrough of how it works">
+  </a>
+</p>
+
+<p align="center"><em>One minute: opening a room, sharing the link, sending files browser to browser,
+verified links, and resuming large transfers. Plays as an MP4 in your browser.</em></p>
+
 ## Self-hosting
 
 ### Prerequisites
@@ -89,18 +101,6 @@ Set these as `environment:` entries on the `filesync` service.
 | `FILESYNC_EXPOSE_STATS` | unset | Set to `1` to include connection counts in `/api/health` |
 
 **Custom HTTP port.** In `docker-compose.yml`, change the first number of the `filesync` port mapping, for example `"8080:80"`.
-
-## How it works
-
-<p align="center">
-  <a href="https://filesync.app/video.mp4">
-    <img src="web/assets/video-poster.png"
-      alt="Watch the FileSync video — a one-minute walkthrough of how it works">
-  </a>
-</p>
-
-<p align="center"><em>One minute: opening a room, sharing the link, sending files browser to browser,
-verified links, and resuming large transfers. Plays as an MP4 in your browser.</em></p>
 
 ## Related projects
 
