@@ -128,6 +128,9 @@ button { font: inherit; color: inherit; }
 
 .visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+/* Chrome's page translator injects this popup and styles it from Google, which the CSP's
+   style-src 'self' blocks, so it would sit unstyled under the page. Translation still works. */
+#goog-gt-tt, .goog-te-balloon-frame, .goog-te-spinner-pos { display: none !important; }
 .icon { width: 16px; height: 16px; flex: none; fill: currentColor; }
 .muted { color: var(--muted); }
 .success-text { color: var(--success-text); }

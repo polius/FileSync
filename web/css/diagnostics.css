@@ -51,6 +51,8 @@
 }
 
 * { box-sizing: border-box; }
+/* Chrome's translator popup, unstyled under the CSP (see app.css). */
+#goog-gt-tt, .goog-te-balloon-frame, .goog-te-spinner-pos { display: none !important; }
 html { -webkit-text-size-adjust: 100%; }
 body {
   font-family: 'Public Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
