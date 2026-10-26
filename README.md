@@ -47,34 +47,52 @@ verified links, and resuming large transfers. Plays as an MP4 in your browser.</
 
 ### Option A — HTTP (quick local test)
 
-For trying FileSync on your own machine. Not for production; use [Option B](#option-b--https-own-domain-recommended) instead. Over plain HTTP, received files are held in memory until complete (over HTTPS they stream to disk), so large files need Option B.
-
-1. Download [`deploy/docker-compose.yml`](deploy/docker-compose.yml).
-2. Start it:
+For trying FileSync on your own network. Over plain HTTP, received files are held in memory until complete, so for large files use [Option B](#option-b--https-own-domain-recommended).
 
 ```bash
+mkdir filesync && cd filesync
+curl -fsSLO https://raw.githubusercontent.com/polius/filesync/main/deploy/docker-compose.yml
 docker compose up -d
 ```
 
-Open `http://localhost` on the machine running Docker.
+Open `http://localhost` on this machine, or `http://<this machine's IP>` from another device on the same network.
 
 ### Option B — HTTPS (own domain, recommended)
 
-1. Download [`deploy/docker-compose-ssl.yml`](deploy/docker-compose-ssl.yml) and [`deploy/Caddyfile`](deploy/Caddyfile).
-2. Open `Caddyfile` and replace `yourdomain.com` (the first line) with your domain.
-3. Point your domain's DNS at the server, then start it:
+You need a server with a public IP and a domain name.
+
+1. Point your domain's DNS (an `A` record) at the server.
+2. Open the [required ports](#required-ports) on the server's firewall.
+3. Download the two files:
+
+   ```bash
+   mkdir filesync && cd filesync
+   curl -fsSLO https://raw.githubusercontent.com/polius/filesync/main/deploy/docker-compose-ssl.yml
+   curl -fsSLO https://raw.githubusercontent.com/polius/filesync/main/deploy/Caddyfile
+   ```
+
+4. Open `Caddyfile` and replace `yourdomain.com` on the first line with your domain.
+5. Start it:
+
+   ```bash
+   docker compose -f docker-compose-ssl.yml up -d
+   ```
+
+Open `https://yourdomain.com`. Caddy gets the certificate automatically.
+
+### Updating
+
+From the `filesync` folder:
 
 ```bash
-docker compose -f docker-compose-ssl.yml up -d
+docker compose pull && docker compose up -d
 ```
 
-Open `https://yourdomain.com`. Caddy gets a certificate automatically and redirects `http://` to `https://`.
-
-The signing secret for TURN credentials is generated on first start and kept in a Docker volume. You don't need to set anything.
+For Option B, add `-f docker-compose-ssl.yml` after `docker compose` in both commands. When the release notes say the compose files changed, download them again first.
 
 ### Required ports
 
-Open these on your server's firewall:
+Open these on your server's firewall (and in your cloud provider's security group, if it has one):
 
 | Port | Protocol | Purpose |
 |---|---|---|
