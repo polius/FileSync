@@ -16,16 +16,16 @@
 
 ## Features
 
-- **Private**: files go directly between browsers over WebRTC, encrypted in transit. The server only introduces devices to each other and never sees file contents.
-- **Verified links**: shared links carry a security key in the part after `#`, which browsers never send to any server. Joining with it proves nobody, not even the server, sits between you and the host.
-- **Any file size**: files stream to disk as they arrive, with flow control so memory stays bounded even when the disk is slower than the network.
+- **Private**: files go straight between browsers, encrypted. The server never sees them.
+- **Verified links**: a key in the link, never sent to the server, proves nobody is in between.
+- **Any file size**: files stream to disk as they arrive, so memory stays low.
 - **Checked on arrival**: every file is verified with SHA-256 when it lands.
-- **Automatic resume**: interrupted transfers reconnect and continue from the last byte saved.
-- **One-to-many**: share a link or QR code; everyone in the room can send and receive. Download everything as one zip.
-- **Folders, paste and messages**: send whole folders (paths are kept in the zip), paste files from the clipboard, and send links or notes to the room.
+- **Automatic resume**: interrupted transfers continue from the last byte saved.
+- **One-to-many**: share a link or QR code; everyone can send, receive and download all as a zip.
+- **Folders, paste and messages**: send folders, paste from the clipboard, chat with the room.
 - **Works across networks**: direct connection when possible, automatic relay when not.
 - **No installs or accounts**: recipients just open a link. Rooms can have a password.
-- **Self-hosted**: a single Docker image plus a TURN relay, both started with one command.
+- **Self-hosted**: one Docker image plus a TURN relay, started with one command.
 
 ## How it works
 
