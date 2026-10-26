@@ -72,7 +72,7 @@ Open `https://yourdomain.com`. Caddy gets a certificate automatically and redire
 
 The signing secret for TURN credentials is generated on first start and kept in a Docker volume. You don't need to set anything.
 
-## Required ports
+### Required ports
 
 Open these on your server's firewall:
 
@@ -86,7 +86,7 @@ Most transfers connect directly. The relay range carries traffic only when one s
 
 If something doesn't work on a device, open `/test.html` on it for a diagnostic report.
 
-## Configuration (optional)
+### Configuration (optional)
 
 Set these as `environment:` entries on the `filesync` service.
 
