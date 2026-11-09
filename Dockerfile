@@ -35,7 +35,9 @@ FROM python:3.15-alpine
 # Nginx, tini (PID 1: forwards signals and reaps zombies), su-exec (run the backend
 # unprivileged), bash (the entrypoint's `wait -n`: busybox ash's never returns for a child
 # killed by a signal, so a crashed process would go unnoticed).
-RUN apk add --no-cache nginx tini su-exec bash
+# apk upgrade picks up Alpine security fixes that the base image doesn't have yet, and
+# Dependabot can't see.
+RUN apk upgrade --no-cache && apk add --no-cache nginx tini su-exec bash
 
 WORKDIR /filesync
 
