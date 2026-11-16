@@ -120,6 +120,10 @@ Set these as `environment:` entries on the `filesync` service.
 
 **Custom HTTP port.** In `docker-compose.yml`, change the first number of the `filesync` port mapping, for example `"8080:80"`.
 
+## One-Click Deploy
+
+[![Deploy on RepoCloud](https://d16t0pc4846x52.cloudfront.net/deploylobe.svg)](https://repocloud.io/details/FileSync/)
+
 ## Related projects
 
 If you prefer the terminal, check out [fsend](https://github.com/polius/fsend): fast, private file sharing from your command line.
