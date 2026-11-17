@@ -16,7 +16,7 @@ services:
     restart: unless-stopped
 
   coturn:
-    image: coturn/coturn:4.18.0-alpine
+    image: coturn/coturn:4.19.0-alpine
     container_name: filesync-coturn
     entrypoint: ["/bin/sh", "-c"]
     command:
