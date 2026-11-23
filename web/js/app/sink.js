@@ -6,7 +6,7 @@ import { addDevBadge } from './devBadge.js';
 //   - 'fs'   File System Access API (Chromium): direct streaming write to a file the user picks.
 //   - 'sw'   Service Worker streaming download: bytes flow through a MessageChannel into the
 //            response body of an intercepted /__download/{id} request.
-//   - 'blob' In-memory Blob (legacy fallback). Holds the whole file in JS heap.
+//   - 'blob' In-memory Blob (legacy fallback). The browser holds the whole file in memory.
 //
 // All sinks expose the same interface:
 //   const sink = await openSink({ id, name, size, mime })
@@ -330,17 +330,34 @@ async function openSwSink({ id, name, size, mime }) {
 
 // ---- Blob (legacy) sink -------------------------------------------------------------
 
+// Received bytes are folded into Blobs as they arrive. A Blob's bytes belong to the browser,
+// which can keep them outside the page (Chromium moves large ones to disk), so the page only
+// ever holds the last few MiB. Building one Blob from every chunk at the end instead held
+// the whole file twice.
+const _BLOB_PART_BYTES = 8 * 1024 * 1024;
+
 function openBlobSink({ name, mime }) {
-  const chunks = [];
+  let parts = [];      // Blobs already folded
+  let chunks = [];     // chunks not folded yet
+  let pending = 0;
+  const fold = () => {
+    if (!chunks.length) return;
+    parts.push(new Blob(chunks));
+    chunks = [];
+    pending = 0;
+  };
   return {
     mode: 'blob',
     async write(chunk) {
-      // Copy into a stable Uint8Array reference (the caller may reuse the buffer).
-      chunks.push(new Uint8Array(chunk));
+      // Each received chunk is a fresh buffer that nothing else mutates, so no copy needed.
+      chunks.push(chunk);
+      pending += chunk.byteLength;
+      if (pending >= _BLOB_PART_BYTES) fold();
     },
     async close() {
-      const blob = new Blob(chunks, mime ? { type: mime } : undefined);
-      chunks.length = 0;
+      fold();
+      const blob = new Blob(parts, mime ? { type: mime } : undefined);
+      parts = [];
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -351,7 +368,9 @@ function openBlobSink({ name, mime }) {
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     },
     async abort() {
-      chunks.length = 0;
+      parts = [];
+      chunks = [];
+      pending = 0;
     },
   };
 }
