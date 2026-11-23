@@ -9,8 +9,8 @@
 // bounded even when the disk (or the zip stage) is slower than the network.
 //
 // SHA-256 covers the whole file. On resume the receiver keeps its running hash; a sender
-// that starts mid-file first hashes the bytes the receiver already has (read locally,
-// nothing is re-sent), so both digests always cover the full content.
+// that starts mid-file hashes the whole file from disk while it sends the rest (nothing is
+// re-sent), so both digests always cover the full content.
 
 import { Hasher } from './hasher.js';
 
@@ -58,6 +58,7 @@ export class OutgoingTransfer {
   #closed = null;
   #done = null;
   #stopped = null;
+  #over = false;
 
   constructor(channel, blob, { maxMessageSize, onProgress } = {}) {
     this.#ch = channel;
@@ -88,8 +89,11 @@ export class OutgoingTransfer {
     this.#acked = start;
     const cached = digestCache.get(this.#blob);
     const hasher = cached ? null : new Hasher();
+    // Normally each slice is hashed as it goes out. A resumed transfer must also cover the
+    // part the receiver already has, so it hashes the whole file from disk, next to the send.
+    const fromDisk = hasher && start > 0 ? this.#hashFile(hasher) : null;
+    fromDisk?.catch(() => {});   // surfaces below, where it is awaited
     try {
-      if (hasher && start > 0) await this.#hashRange(hasher, 0, start);
       this.#send(JSON.stringify({ t: 'header', size, offset: start }));
 
       let pos = start;
@@ -103,9 +107,13 @@ export class OutgoingTransfer {
           await this.#room(pos + o + part.byteLength);
           this.#send(part);
         }
-        if (hasher) hasher.update(buf);
+        if (hasher && !fromDisk) {
+          hasher.update(buf);
+          await hasher.pace();   // hashing must not fall behind the link without limit
+        }
         pos = end;
       }
+      await fromDisk;
       const sha256 = cached || await hasher.digest();
       if (!cached) digestCache.set(this.#blob, sha256);
       this.#send(JSON.stringify({ t: 'end', sha256 }));
@@ -114,14 +122,23 @@ export class OutgoingTransfer {
       try { ch.close(); } catch { /* already closed */ }
       return sha256;
     } finally {
+      this.#over = true;
       hasher?.dispose();
     }
   }
 
-  async #hashRange(hasher, from, to) {
-    for (let p = from; p < to; p += READ_SLICE * 4) {
-      this.#check();
-      hasher.update(new Uint8Array(await this.#blob.slice(p, Math.min(p + READ_SLICE * 4, to)).arrayBuffer()));
+  // The disk reads several times faster than SHA-256 runs, so pace() sets the speed here.
+  // Unpaced, a late resume of a large file queued most of the file in memory.
+  async #hashFile(hasher) {
+    const size = this.#blob.size;
+    const step = READ_SLICE * 4;
+    const read = (p) => this.#blob.slice(p, Math.min(p + step, size)).arrayBuffer();
+    let next = size > 0 ? read(0) : null;
+    for (let p = 0; p < size && !this.#over; p += step) {
+      const buf = new Uint8Array(await next);
+      next = p + step < size ? read(p + step) : null;   // read ahead while this slice is hashed
+      hasher.update(buf);
+      await hasher.pace();
     }
   }
 
@@ -303,6 +320,7 @@ export class IncomingTransfer {
     const bytes = parts.length === 1 ? parts[0] : concat(parts);
     await st.sink.write(bytes);
     st.hasher.update(bytes);
+    await st.hasher.pace();   // a slow CPU holds back the acks rather than piling up chunks
     st.written += bytes.byteLength;
     this.onProgress(st.written);
     if (st.written - this.#lastAck >= ACK_EVERY || st.written === st.size) {
