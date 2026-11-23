@@ -4,12 +4,13 @@ import { addDevBadge } from './devBadge.js';
 //
 // Three implementations:
 //   - 'fs'   File System Access API (Chromium): direct streaming write to a file the user picks.
-//   - 'sw'   Service Worker streaming download: bytes flow through a MessageChannel into the
-//            response body of an intercepted /__download/{id} request.
+//   - 'sw'   Staged download: bytes are written to a private file (OPFS), which the browser
+//            then saves as a normal download. Named after the Service Worker that used to
+//            stream that file out; the name stays because overrides and reports use it.
 //   - 'blob' In-memory Blob (legacy fallback). The browser holds the whole file in memory.
 //
 // All sinks expose the same interface:
-//   const sink = await openSink({ id, name, size, mime })
+//   const sink = await openSink({ id, name, mime })
 //   await sink.write(uint8Array)            // resolves once the bytes are stored
 //   await sink.close()                      // success
 //   await sink.abort(reason?)               // cleanup on failure / user abort
@@ -192,14 +193,14 @@ function extensionFromName(name) {
   return idx >= 0 ? name.slice(idx) : '';
 }
 
-// ---- SW streaming sink --------------------------------------------------------------
+// ---- Staged sink ('sw') ---------------------------------------------------------------
 //
 // Bytes are staged into an OPFS file while the transfer runs; the browser download is
-// created only at close(), streaming the staged file into the Service Worker response.
-// A failed/interrupted transfer therefore never leaves a partial download behind, and
-// the staged file doubles as the resume buffer across reconnections.
+// created only at close(). A failed/interrupted transfer therefore never leaves a partial
+// download behind, and the staged file doubles as the resume buffer across reconnections.
 //
-// The staged file is re-emitted as the download: ~2x free space, OPFS-quota subject.
+// The staged file is then copied by the browser into the download: ~2x free space,
+// OPFS-quota subject.
 
 // Abandoned staging files (transfer interrupted, then the tab closed) are swept on boot.
 const _STAGING_PREFIX = 'filesync-part-';
@@ -223,109 +224,72 @@ export async function sweepStaleStaging() {
   } catch {}
 }
 
-async function openSwSink({ id, name, size, mime }) {
+// Nothing tells the page when the browser has finished copying a download, so a staged file
+// outlives its hand-over: ten minutes, plus the time a slow disk (8 MiB/s) would need to copy
+// it. Starting another staged download reclaims the ones handed over a while ago, so files
+// received one after another don't add up in the origin's storage.
+const _stagingKeepMs = (bytes) => 10 * 60_000 + (bytes / (8 * 1024 * 1024)) * 1000;
+const _DELIVERED_GRACE_MS = 30_000;
+const _delivered = new Map();   // staging name -> { at, drop }
+
+function keepDelivered(root, stagingName, url, bytes) {
+  const entry = { at: Date.now() };
+  const timer = setTimeout(() => entry.drop(), _stagingKeepMs(bytes));
+  entry.drop = () => {
+    clearTimeout(timer);
+    _delivered.delete(stagingName);
+    URL.revokeObjectURL(url);
+    root.removeEntry(stagingName).catch(() => {});   // if it can't go now, the boot sweep takes it
+  };
+  _delivered.set(stagingName, entry);
+}
+
+function reclaimDelivered() {
+  const now = Date.now();
+  for (const entry of [..._delivered.values()]) {
+    if (now - entry.at >= _DELIVERED_GRACE_MS) entry.drop();
+  }
+}
+
+async function openSwSink({ id, name, mime }) {
   if (!navigator.storage || typeof navigator.storage.getDirectory !== 'function') {
     throw new Error('OPFS is not available in this browser.');
   }
   const root = await navigator.storage.getDirectory();
+  reclaimDelivered();
   const stagingName = `${_STAGING_PREFIX}${id}`;
   // Leftover staging from an earlier session with this id is dead weight — drop it.
   try { await root.removeEntry(stagingName); } catch {}
   const handle = await root.getFileHandle(stagingName, { create: true });
   const writable = await handle.createWritable();
 
-  const cleanupStaging = () => {
-    setTimeout(() => { root.removeEntry(stagingName).catch(() => {}); }, 30_000);
-  };
-
-  // Stream the staged file into a fresh SW download. Runs once, at completion.
+  // Hand the staged file to the browser as a download. The Blob behind the link is the file
+  // on disk, so the browser copies it by itself and none of it passes through this page.
+  // Pumping it through the Service Worker instead read the file a second time in script,
+  // and Firefox holds such a response in memory: about 3 GiB for a 1 GiB file.
   const deliver = async () => {
     await writable.close();
-    const reg = sinkState.serviceWorkerRegistration;
-    const sw = reg && (reg.active || reg.waiting || reg.installing);
-    if (!sw) throw new Error('Service Worker not available.');
-
-    const channel = new MessageChannel();
-    // Credit-gated flow control (protocol in sw.js); 'cancel' unblocks a waiting sender.
-    let credits = 0;
-    let cancelled = false;
-    let wake = null;
-    const notify = () => { const w = wake; wake = null; if (w) w(); };
-    const ready = new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Service Worker did not respond.')), 5000);
-      channel.port1.onmessage = (ev) => {
-        if (ev.data?.type === 'ready') {
-          clearTimeout(timeout);
-          resolve();
-        } else if (ev.data?.type === 'credit') {
-          credits += ev.data.n || 0;
-          notify();
-        } else if (ev.data?.type === 'cancel') {
-          // User cancelled the browser download — call this sink's onCancel hook (if any).
-          cancelled = true;
-          notify();
-          if (typeof sink._onCancel === 'function') sink._onCancel();
-        }
-      };
-    });
-
-    (reg.active || sw).postMessage(
-      { type: 'register', id, name, size, mime, port: channel.port2 },
-      [channel.port2],
-    );
-    await ready;
-
-    // Trigger the download by navigating a hidden iframe to the intercepted URL.
-    const iframe = document.createElement('iframe');
-    iframe.hidden = true;
-    iframe.src = `/__download/${encodeURIComponent(id)}`;
-    document.body.appendChild(iframe);
-
-    const port = channel.port1;
-    const waitForCredit = () => new Promise((resolve) => {
-      if (credits > 0) { credits -= 1; return resolve(true); }
-      if (cancelled) return resolve(false);
-      wake = () => resolve(!cancelled);
-    });
-
-    const stagedFile = await handle.getFile();
-    const reader = stagedFile.stream().getReader();
-    try {
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        if (!await waitForCredit()) {
-          try { await reader.cancel(); } catch {}
-          throw new DOMException('The download was cancelled in the browser.', 'AbortError');
-        }
-        const buf = value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength);
-        port.postMessage(buf, [buf]);
-      }
-      port.postMessage({ type: 'end' });
-    } catch (err) {
-      // Tear down the worker side so it doesn't hold a half-open response open.
-      try { port.postMessage({ type: 'abort', reason: err && err.message }); } catch {}
-      throw err;
-    } finally {
-      port.close();
-      setTimeout(() => iframe.remove(), 1000);
-      cleanupStaging();
-    }
+    const file = await handle.getFile();
+    // slice() only relabels the same bytes on disk with the file's type; nothing is read.
+    const url = URL.createObjectURL(mime ? file.slice(0, file.size, mime) : file);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    keepDelivered(root, stagingName, url, file.size);
   };
 
-  const sink = {
+  return {
     mode: 'sw',
-    // Callers (room.download / room.downloadAll) assign a callback here so that a
-    // browser-side cancel aborts the transfer instead of leaving it running.
-    _onCancel: null,
     async write(chunk) { await writable.write(chunk); },
     async close() { await deliver(); },
-    async abort(reason) {
+    async abort() {
       try { await writable.close(); } catch {}
       try { await root.removeEntry(stagingName); } catch {}
     },
   };
-  return sink;
 }
 
 // ---- Blob (legacy) sink -------------------------------------------------------------
@@ -377,11 +341,11 @@ function openBlobSink({ name, mime }) {
 
 // ---- Selection --------------------------------------------------------------------
 
-export async function openSink({ id, name, size, mime }) {
+export async function openSink({ id, name, mime }) {
   const mode = resolveSinkMode();
   try {
     if (mode === 'fs') return await openFsSink({ name, mime });
-    if (mode === 'sw') return await openSwSink({ id, name, size, mime });
+    if (mode === 'sw') return await openSwSink({ id, name, mime });
     return openBlobSink({ name, mime });
   } catch (err) {
     // User-initiated cancel (e.g., dismissed the save picker) — propagate without
@@ -393,7 +357,7 @@ export async function openSink({ id, name, size, mime }) {
     // Otherwise, try the next available option down the chain.
     if (mode === 'fs') {
       try {
-        if (sinkState.serviceWorkerReady) return await openSwSink({ id, name, size, mime });
+        if (sinkState.serviceWorkerReady) return await openSwSink({ id, name, mime });
       } catch (swErr) {
         if (swErr && swErr.name === 'AbortError') throw swErr;
       }
