@@ -256,7 +256,6 @@ export class Room extends Emitter {
       return;
     }
     this.#startDownload(f, sink);
-    if (sink && 'mode' in sink) sink._onCancel = () => this.cancelDownload(id);
   }
 
   cancelDownload(id) {
@@ -285,7 +284,6 @@ export class Room extends Emitter {
       total: todo.reduce((s, f) => s + f.size, 0), doneBytes: 0, current: null, skipped: 0, error: null, cancel: null,
     };
     this.bundle = bundle;
-    if (zipSink && 'mode' in zipSink) zipSink._onCancel = () => this.cancelBundle();
     this.#changed();
 
     const nameFor = zipEntryNamer();

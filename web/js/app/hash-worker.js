@@ -7,6 +7,7 @@ self.onmessage = (ev) => {
   const msg = ev.data || {};
   try {
     if (msg.op === 'update') hash.update(msg.bytes);
+    else if (msg.op === 'sync') self.postMessage({ seq: msg.seq });
     else if (msg.op === 'digest') self.postMessage({ seq: msg.seq, hex: hash.digestHex() });
   } catch (err) {
     self.postMessage({ seq: msg.seq, error: String(err && err.message || err) });
