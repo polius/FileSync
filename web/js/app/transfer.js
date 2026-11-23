@@ -189,6 +189,15 @@ export class OutgoingTransfer {
 
 // ---- Receiver --------------------------------------------------------------------------
 
+function concat(parts) {
+  let n = 0;
+  for (const p of parts) n += p.byteLength;
+  const out = new Uint8Array(n);
+  let o = 0;
+  for (const p of parts) { out.set(p, o); o += p.byteLength; }
+  return out;
+}
+
 // Per-download state that survives reconnects: the sink, the bytes durably written, and
 // the running hash over exactly those bytes.
 export class DownloadState {
@@ -213,6 +222,8 @@ export class IncomingTransfer {
   #stallTimer = null;
   #settle = null;
   #finished = false;
+  #pending = [];
+  #flushQueued = false;
 
   #stallMs;
 
@@ -269,22 +280,35 @@ export class IncomingTransfer {
     const st = this.#state;
     this.#received += bytes.byteLength;
     if (this.#received > st.size) return this.#abort('too-much-data', false);
-    // Writes are serialized; the hash advances only with bytes that reached the sink, so
-    // after an interruption `written` and the hash agree exactly.
-    this.#queue = this.#queue.then(async () => {
-      if (this.#finished) return;
-      await st.sink.write(bytes);
-      st.hasher.update(bytes);
-      st.written += bytes.byteLength;
-      this.onProgress(st.written);
-      if (st.written - this.#lastAck >= ACK_EVERY || st.written === st.size) {
-        this.#lastAck = st.written;
-        this.#sendCtl({ t: 'ack', bytes: st.written });
-      }
-    }).catch((err) => {
+    // Chunks that arrive while a write is in flight are written together by the next flush:
+    // one storage call per batch instead of one per 64 KiB message. Each call is a round trip
+    // to the browser, which capped LAN transfers far below the network.
+    this.#pending.push(bytes);
+    if (this.#flushQueued) return;
+    this.#flushQueued = true;
+    this.#queue = this.#queue.then(() => this.#flush()).catch((err) => {
       console.error('Sink write failed:', err);
       this.#abort('write-failed', false);
     });
+  }
+
+  // Writes are serialized; the hash advances only with bytes that reached the sink, so
+  // after an interruption `written` and the hash agree exactly (unwritten chunks are dropped).
+  async #flush() {
+    this.#flushQueued = false;
+    const parts = this.#pending;
+    this.#pending = [];
+    if (this.#finished) return;
+    const st = this.#state;
+    const bytes = parts.length === 1 ? parts[0] : concat(parts);
+    await st.sink.write(bytes);
+    st.hasher.update(bytes);
+    st.written += bytes.byteLength;
+    this.onProgress(st.written);
+    if (st.written - this.#lastAck >= ACK_EVERY || st.written === st.size) {
+      this.#lastAck = st.written;
+      this.#sendCtl({ t: 'ack', bytes: st.written });
+    }
   }
 
   async #finish(sha256) {

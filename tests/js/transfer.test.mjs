@@ -63,6 +63,24 @@ test('flow control: the sender never runs more than WINDOW ahead of durable writ
   assert.ok(maxAhead <= WINDOW + 1024 * 1024 + 64 * 1024, `sender ran ${maxAhead} bytes ahead`);
 });
 
+test('chunks that arrive during a slow write are written together, byte for byte', async () => {
+  const { bytes, blob } = makeFile(8 * 1024 * 1024 + 5);
+  const [tx, rx] = channelPair();
+  const sink = memorySink();
+  let writes = 0;
+  const write = sink.write.bind(sink);
+  sink.write = async (b) => { writes++; await tick(5); return write(b); };
+  const [sent, got] = await Promise.all([
+    new OutgoingTransfer(tx, blob).run(0),
+    new IncomingTransfer(rx, new DownloadState(sink, blob.size)).run(),
+  ]);
+  assert.equal(got, sha(bytes));
+  assert.equal(sent, got);
+  assert.deepEqual(sink.bytes(), bytes);
+  const messages = Math.ceil(blob.size / (64 * 1024));
+  assert.ok(writes < messages / 2, `${writes} writes for ${messages} messages`);
+});
+
 test('resume continues from the bytes written and still verifies the whole file', async () => {
   const { bytes, blob } = makeFile(5 * 1024 * 1024 + 3);
   const sink = memorySink();
