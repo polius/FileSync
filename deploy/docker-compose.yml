@@ -50,7 +50,8 @@ services:
     depends_on:
       init:
         condition: service_completed_successfully
-    # Host networking: publishing the relay range spawns one docker-proxy per port.
+    # Host networking instead of ports: publishing 50000-50100 starts ~200 docker-proxy
+    # processes, which exhausts memory on small servers.
     network_mode: host
     restart: unless-stopped
 
