@@ -50,10 +50,9 @@ services:
     depends_on:
       init:
         condition: service_completed_successfully
-    ports:
-      - "3478:3478/tcp"
-      - "3478:3478/udp"
-      - "50000-50100:50000-50100/udp"
+    # Host networking instead of ports: publishing 50000-50100 starts ~200 docker-proxy
+    # processes, which exhausts memory on small servers.
+    network_mode: host
     restart: unless-stopped
 
   init:
