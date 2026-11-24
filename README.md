@@ -44,6 +44,7 @@ verified links, and resuming large transfers. Plays as an MP4 in your browser.</
 ### Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) with [Docker Compose](https://docs.docker.com/compose/install/)
+- The TURN server (coturn) uses host networking. That works out of the box on Linux; on Docker Desktop (macOS, Windows), turn on [host networking](https://docs.docker.com/engine/network/drivers/host/#docker-desktop) in Settings first
 
 ### Option A — HTTP (quick local test)
 

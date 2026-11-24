@@ -50,10 +50,11 @@ services:
     depends_on:
       init:
         condition: service_completed_successfully
-    ports:
-      - "3478:3478/tcp"
-      - "3478:3478/udp"
-      - "50000-50100:50000-50100/udp"
+    # Host networking, not published ports: Docker runs one docker-proxy process per
+    # published port and address family, so the 101-port relay range alone cost ~200
+    # processes (~1.3 MB each plus kernel stacks), enough to swap-thrash a 512 MB host.
+    # coturn listens on 3478 and relays on 50000-50100 directly; open them in the firewall.
+    network_mode: host
     restart: unless-stopped
 
   init:
